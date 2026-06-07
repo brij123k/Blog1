@@ -2,100 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Nav from "./components/landingPage/nav";
-
-// ─── Animated Star Field ───────────────────────────────────────────────────
-function StarField() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-    const stars = Array.from({ length: 300 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 1.5 + 0.2,
-      phase: Math.random() * Math.PI * 2,
-      speed: Math.random() * 0.007 + 0.003,
-    }));
-    let id: number;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      stars.forEach((s) => {
-        s.phase += s.speed;
-        const a = 0.25 + 0.7 * Math.abs(Math.sin(s.phase));
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(200,225,255,${a})`;
-        ctx.fill();
-      });
-      id = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => { cancelAnimationFrame(id); window.removeEventListener("resize", resize); };
-  }, []);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
-}
-
-// ─── Orbital Rings (CSS animated) ─────────────────────────────────────────
-function OrbitalRings() {
-  return (
-    <div className="absolute inset-0 flex items-end justify-center pointer-events-none overflow-hidden">
-      <svg viewBox="0 0 900 480" className="w-full" style={{ maxWidth: 1200, marginBottom: -2 }} preserveAspectRatio="xMidYMax meet">
-        {[460, 370, 290, 210, 140].map((rx, i) => (
-          <ellipse key={i} cx={450} cy={480} rx={rx} ry={rx * 0.26} fill="none" stroke={`rgba(100,160,255,${0.07 + i * 0.02})`} strokeWidth={0.8} />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-function Planet() {
-  return (
-    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none" style={{ width: 720, height: 360 }}>
-      <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: -70, width: 700, height: 340, borderRadius: "50%", background: "radial-gradient(ellipse at 50% 55%, rgba(30,90,210,0.3) 0%, rgba(10,35,110,0.15) 50%, transparent 75%)", filter: "blur(22px)" }} />
-      <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: -100, width: 620, height: 310, borderRadius: "50%", background: "radial-gradient(ellipse at 44% 36%, #4080e0 0%, #1a3ea0 32%, #0d1f6a 58%, #05103a 100%)", boxShadow: "0 0 90px 24px rgba(30,80,200,0.35), inset 0 -24px 70px rgba(0,0,30,0.55)", overflow: "hidden" }}>
-        {[28, 52, 72].map((t, i) => (<div key={i} style={{ position: "absolute", top: `${t}%`, left: 0, right: 0, height: 16, background: "linear-gradient(90deg,transparent,rgba(80,150,255,0.07),rgba(60,130,220,0.1),transparent)", borderRadius: "50%", transform: "scaleX(1.15)" }} />))}
-        <div style={{ position: "absolute", top: "7%", left: "10%", width: "52%", height: "32%", borderRadius: "50%", background: "radial-gradient(ellipse,rgba(110,180,255,0.18) 0%,transparent 70%)", transform: "rotate(-18deg)" }} />
-      </div>
-    </div>
-  );
-}
-
-// ─── Floating Orbs ────────────────────────────────────────────────────────
-function FloatingOrbs() {
-  const orbs = [
-    { size: 300, x: "10%", y: "20%", color: "rgba(59,130,246,0.12)", dur: "8s" },
-    { size: 200, x: "75%", y: "60%", color: "rgba(168,85,247,0.10)", dur: "11s" },
-    { size: 400, x: "60%", y: "5%", color: "rgba(14,165,233,0.08)", dur: "14s" },
-    { size: 150, x: "5%", y: "70%", color: "rgba(236,72,153,0.08)", dur: "9s" },
-  ];
-  return (
-    <div className="fixed inset-0 pointer-events-none z-0">
-      {orbs.map((orb, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full blur-3xl"
-          style={{
-            width: orb.size,
-            height: orb.size,
-            left: orb.x,
-            top: orb.y,
-            background: orb.color,
-            animation: `float-orb ${orb.dur} ease-in-out infinite alternate`,
-            animationDelay: `${i * 1.5}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+import CosmicBackgroundWrapper from "./components/CosmicBackgroundWrapper";
 
 
 
@@ -114,74 +21,113 @@ function Hero() {
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       setMouse({
-        x: (e.clientX - cx) / rect.width,   // -0.5 to 0.5
-        y: (e.clientY - cy) / rect.height,  // -0.5 to 0.5
+        x: (e.clientX - cx) / rect.width,
+        y: (e.clientY - cy) / rect.height,
       });
     };
     window.addEventListener("mousemove", handleMove);
     return () => window.removeEventListener("mousemove", handleMove);
   }, []);
 
-  // Parallax offset values (astronaut moves more than bg)
-  const astroX = mouse.x * 28;
-  const astroY = mouse.y * 18;
-  const bgX    = mouse.x * -8;
-  const bgY    = mouse.y * -5;
+  // Parallax offset values
+  const astronautX = mouse.x * 20;
+  const astronautY = mouse.y * 15;
+  const titleX = mouse.x * 5;
+  const titleY = mouse.y * 3;
 
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
 
-        @keyframes hero-fadein {
-          from { opacity:0; transform:translateY(28px); }
-          to   { opacity:1; transform:translateY(0); }
+        @keyframes hero-fadein-left {
+          from { opacity: 0; transform: translateX(-30px); }
+          to { opacity: 1; transform: translateX(0); }
         }
+        
+        @keyframes hero-fadein-right {
+          from { opacity: 0; transform: translateX(30px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes hero-fadein-up {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
         @keyframes badge-glow {
-          0%,100% { box-shadow:0 0 0 0 rgba(96,165,250,0); }
-          50%      { box-shadow:0 0 0 5px rgba(96,165,250,0.18); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(96,165,250,0); }
+          50% { box-shadow: 0 0 0 5px rgba(96,165,250,0.18); }
         }
+        
         @keyframes dot-pulse {
-          0%,100% { opacity:0.6; transform:scale(1); }
-          50%      { opacity:1;   transform:scale(1.35); }
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.35); }
+        }
+        
+        @keyframes float-astronaut {
+          0%, 100% { transform: translateY(0px) translateX(0px) rotate(-3deg); }
+          25% { transform: translateY(-10px) translateX(8px) rotate(-1deg); }
+          50% { transform: translateY(0px) translateX(15px) rotate(-5deg); }
+          75% { transform: translateY(10px) translateX(8px) rotate(-1deg); }
+        }
+        
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
         }
 
-        /* The key trick: title layer is a stacking context */
-        .title-wrap {
-          position: relative;
-          isolation: isolate;
+        @keyframes glow-pulse {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.05); }
         }
 
         /* Giant title text */
         .hero-title {
           font-family: 'Bebas Neue', sans-serif;
-          font-size: clamp(80px, 14vw, 158px);
-          line-height: 0.9;
+          font-size: clamp(60px, 10vw, 130px);
+          line-height: 0.85;
           letter-spacing: 0.01em;
           color: #fff;
           margin: 0;
           user-select: none;
-          animation: hero-fadein 0.8s cubic-bezier(.22,1,.36,1) 0.2s both;
+          text-shadow: 0 0 30px rgba(0,0,0,0.5);
         }
 
         /* The "SEARCH" outline word */
         .hero-title-outline {
           color: transparent;
-          -webkit-text-stroke: 2.5px rgba(255,255,255,0.5);
+          -webkit-text-stroke: 2.5px rgba(255,255,255,0.6);
+          text-shadow: none;
         }
 
-        /* Astronaut image — sits OVER the title using mix-blend-mode
-           so wherever the astronaut overlaps white text, 
-           the text shows through (multiply darkens white to image color) */
-        .astronaut-img {
+        /* Astronaut image - positioned on right */
+        .astronaut-wrapper {
           position: absolute;
+          right: 0;
+          top: 50%;
+          transform: translateY(-50%);
           pointer-events: none;
           user-select: none;
-          mix-blend-mode: lighten;   /* text appears transparent behind white suit */
-          filter: drop-shadow(0 0 32px rgba(80,140,255,0.25))
-                  drop-shadow(0 0 80px rgba(40,80,200,0.18));
+          z-index: 1;
+        }
+
+        .astronaut-bg {
+          filter: drop-shadow(0 0 50px rgba(80,140,255,0.4))
+                  drop-shadow(0 0 120px rgba(40,80,200,0.3));
           will-change: transform;
-          transition: transform 0.12s cubic-bezier(.22,1,.36,1);
+        }
+
+        /* Text content wrapper - on left */
+        .hero-content {
+          position: relative;
+          z-index: 3;
+        }
+
+        /* Title that overlaps the image */
+        .overlapping-title {
+          position: relative;
+          z-index: 4;
         }
 
         .input-wrap:focus-within {
@@ -190,101 +136,271 @@ function Hero() {
         }
 
         ::placeholder { color: rgba(140,180,255,0.3); }
+        
+        /* Floating particles */
+        .particle {
+          position: absolute;
+          background: radial-gradient(circle, rgba(100,160,255,0.4), transparent);
+          border-radius: 50%;
+          pointer-events: none;
+          animation: float-slow 8s ease-in-out infinite;
+        }
       `}</style>
 
       <section
         ref={sectionRef}
-        className="relative min-h-screen flex flex-col overflow-hidden"
-        style={{ background: "linear-gradient(175deg,#030c1e 0%,#06132e 45%,#0b1c4a 80%,#0e2255 100%)" }}
+        className="relative min-h-screen w-full flex items-center"
+        style={{ background: "transparent" }}
       >
-        {/* Stars layer */}
-        <StarField />
-
-        {/* Subtle top atmospheric radial */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 55% 0%,rgba(25,65,170,0.2) 0%,transparent 60%)" }} />
-
-        {/* Orbit arcs + planet */}
-        <OrbitalRings />
-        <Planet />
-
-        {/* ── Nav ── */}
-        
-
-        {/* ── Content layer ── */}
-        <div className="relative z-10 flex flex-col px-8 md:px-14 mt-10 md:mt-14" style={{ maxWidth: 800 }}>
-
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 self-start mb-7"
-            style={{ fontFamily:"'Space Mono',monospace", fontSize:11, color:"rgba(160,205,255,0.85)", border:"1px solid rgba(100,160,255,0.22)", borderRadius:999, padding:"6px 14px", background:"rgba(30,65,170,0.18)", backdropFilter:"blur(10px)", animation:"badge-glow 3s ease-in-out infinite, hero-fadein 0.6s ease 0.05s both" }}>
-            <span style={{ width:6, height:6, borderRadius:"50%", background:"#60a5fa", display:"inline-block", animation:"dot-pulse 2s ease-in-out infinite" }} />
-            2,479+ Businesses Growing · Zero Technical Skills
-          </div>
-
-          {/* ── Title + Astronaut stacking zone ── */}
-          <div className="title-wrap" style={{ position: "relative" }}>
-
-            {/* Title text — z-index 1, below astronaut */}
-            <h1 className="hero-title" style={{ position: "relative", zIndex: 1 }}>
-              Dominate<br />
-              <span className="hero-title-outline">Search</span>
-            </h1>
-
-            {/* ── ASTRONAUT — real photo, parallax, mix-blend-mode ── */}
+        {/* Astronaut Background Layer - Center Right */}
+        <div className="astronaut-wrapper">
+          <div
+            className="astronaut-bg"
+            style={{
+              transform: `translate(${astronautX}px, ${astronautY}px)`,
+              animation: "float-astronaut 10s ease-in-out infinite",
+            }}
+          >
             <img
               src="/astronot.png"
               alt="floating astronaut"
-              className="astronaut-img"
               style={{
-                /* Position: right side, overlapping both title lines */
+                width: "clamp(400px, 45vw, 700px)",
+                height: "auto",
+                mixBlendMode: "screen",
+                display: "block",
+              }}
+            />
+            
+            {/* Glow effect behind astronaut */}
+            <div
+              style={{
                 position: "absolute",
-                right: "-18%",
-                top: "-10%",
-                width: "clamp(320px, 42vw, 600px)",
-                zIndex: 2,
-                transform: `translate(${astroX}px, ${astroY}px) rotate(-6deg)`,
+                inset: "-15%",
+                background: "radial-gradient(circle, rgba(59,130,246,0.25), transparent 70%)",
+                filter: "blur(50px)",
+                borderRadius: "50%",
+                zIndex: -1,
+                animation: "glow-pulse 4s ease-in-out infinite",
               }}
             />
           </div>
+        </div>
 
-          {/* Subtext */}
-          <p style={{ fontFamily:"'Inter',sans-serif", fontSize:15, color:"rgba(200,225,255,0.58)", marginTop:18, marginBottom:34, maxWidth:440, lineHeight:1.75, animation:"hero-fadein 0.7s ease 0.42s both" }}>
-            We write{" "}
-            <span style={{ color:"#93c5fd", fontWeight:600 }}>30 deep-researched articles</span> +
-            build{" "}
-            <span style={{ color:"#c4b5fd", fontWeight:600 }}>100 DA backlinks</span>{" "}
-            every month — ChatGPT, Perplexity &amp; Google included.
-          </p>
+        {/* Floating particles for depth */}
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="particle"
+            style={{
+              width: Math.random() * 8 + 2,
+              height: Math.random() * 8 + 2,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 10}s`,
+              animationDuration: `${Math.random() * 10 + 5}s`,
+              opacity: Math.random() * 0.4,
+            }}
+          />
+        ))}
 
-          {/* ── Input pill ── */}
-          <div className="input-wrap"
-            style={{ display:"flex", alignItems:"center", maxWidth:500, background:"rgba(6,16,48,0.78)", border:"1px solid rgba(100,160,255,0.28)", borderRadius:999, padding:"6px 6px 6px 20px", backdropFilter:"blur(18px)", boxShadow:"0 4px 28px rgba(0,0,0,0.35)", transition:"border-color 0.2s, box-shadow 0.2s", animation:"hero-fadein 0.7s ease 0.58s both" }}>
-            <span style={{ fontFamily:"'Space Mono',monospace", fontSize:12, color:"rgba(100,150,255,0.48)", whiteSpace:"nowrap", marginRight:4 }}>https://</span>
-            <input
-              type="text"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="yourwebsite.com"
-              style={{ flex:1, background:"transparent", border:"none", outline:"none", fontFamily:"'Space Mono',monospace", fontSize:13, color:"#ddeeff", caretColor:"#60a5fa" }}
-            />
-            <button
-              style={{ background:"#fff", color:"#07122e", border:"none", borderRadius:999, padding:"10px 22px", fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, transition:"opacity 0.18s, transform 0.15s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity="0.88"; (e.currentTarget as HTMLElement).style.transform="scale(1.03)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity="1"; (e.currentTarget as HTMLElement).style.transform="scale(1)"; }}>
-              Get 3 Free Articles ↗
-            </button>
-          </div>
+        {/* Content Layer - Left Side */}
+        <div className="hero-content w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-16 py-20">
+          <div className="max-w-2xl">
+            {/* Badge */}
+            <div
+              className="inline-flex items-center gap-2 mb-6 md:mb-8"
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 11,
+                color: "rgba(160,205,255,0.85)",
+                border: "1px solid rgba(100,160,255,0.22)",
+                borderRadius: 999,
+                padding: "6px 16px",
+                background: "rgba(30,65,170,0.15)",
+                backdropFilter: "blur(10px)",
+                animation: "badge-glow 3s ease-in-out infinite, hero-fadein-left 0.6s ease 0.05s both",
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#60a5fa",
+                  display: "inline-block",
+                  animation: "dot-pulse 2s ease-in-out infinite",
+                }}
+              />
+              2,479+ Businesses Growing · Zero Technical Skills
+            </div>
 
-          {/* Stats row */}
-          <div className="flex flex-wrap gap-6 mt-7"
-            style={{ fontFamily:"'Space Mono',monospace", fontSize:11, color:"rgba(140,185,255,0.5)", animation:"hero-fadein 0.7s ease 0.72s both" }}>
-            {[{ icon:"🚀", label:"216% Avg Traffic Increase" }, { icon:"🌍", label:"100 Languages" }, { icon:"⚡", label:"1 Article Daily" }].map(s => (
-              <span key={s.label} style={{ display:"flex", alignItems:"center", gap:6 }}>{s.icon} {s.label}</span>
-            ))}
+<div
+  className="overlapping-title"
+  style={{
+    animation: "hero-fadein-left 0.8s cubic-bezier(.22,1,.36,1) 0.2s both",
+    whiteSpace: "nowrap",
+  }}
+>
+  <h1
+    className="hero-title"
+    style={{
+      transform: `translate(${titleX * 0.3}px, ${titleY * 0.3}px)`,
+      display: "inline-block",
+      margin: 0,
+      marginRight: "clamp(12px, 3vw, 30px)",
+      fontSize: "clamp(60px, 12vw, 148px)",
+      lineHeight: 1,
+    }}
+  >
+    DOMINATE
+  </h1>
+  <h1
+    className="hero-title"
+    style={{
+      transform: `translate(${titleX * 0.2}px, ${titleY * 0.2}px)`,
+      display: "inline-block",
+      margin: 0,
+      fontSize: "clamp(60px, 12vw, 148px)",
+      lineHeight: 1,
+    }}
+  >
+    <span className="hero-title-outline">SEARCH</span>
+  </h1>
+</div>    
+
+            {/* Subtext */}
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "clamp(14px, 3vw, 16px)",
+                color: "rgba(200,225,255,0.65)",
+                marginTop: 24,
+                marginBottom: 36,
+                maxWidth: 500,
+                lineHeight: 1.7,
+                animation: "hero-fadein-left 0.7s ease 0.42s both",
+              }}
+            >
+              We write{" "}
+              <span style={{ color: "#93c5fd", fontWeight: 600 }}>
+                30 deep-researched articles
+              </span>{" "}
+              + build{" "}
+              <span style={{ color: "#c4b5fd", fontWeight: 600 }}>
+                100 DA backlinks
+              </span>{" "}
+              every month — ChatGPT, Perplexity &amp; Google included.
+            </p>
+
+            {/* Input Pill */}
+            <div
+              className="input-wrap"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                maxWidth: 520,
+                width: "100%",
+                background: "rgba(6,16,48,0.7)",
+                border: "1px solid rgba(100,160,255,0.28)",
+                borderRadius: 999,
+                padding: "6px 6px 6px 24px",
+                backdropFilter: "blur(18px)",
+                boxShadow: "0 4px 28px rgba(0,0,0,0.35)",
+                transition: "border-color 0.2s, box-shadow 0.2s",
+                animation: "hero-fadein-left 0.7s ease 0.58s both",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  color: "rgba(100,150,255,0.48)",
+                  whiteSpace: "nowrap",
+                  marginRight: 8,
+                }}
+              >
+                https://
+              </span>
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="yourwebsite.com"
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 13,
+                  color: "#ddeeff",
+                  caretColor: "#60a5fa",
+                  padding: "10px 0",
+                }}
+              />
+              <button
+                style={{
+                  background: "#fff",
+                  color: "#07122e",
+                  border: "none",
+                  borderRadius: 999,
+                  padding: "10px 26px",
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  transition: "opacity 0.18s, transform 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.opacity = "0.88";
+                  (e.currentTarget as HTMLElement).style.transform = "scale(1.03)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.opacity = "1";
+                  (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+                }}
+              >
+                Get 3 Free Articles ↗
+              </button>
+            </div>
+
+            {/* Stats Row */}
+            <div
+              className="flex flex-wrap gap-6 mt-8"
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 11,
+                color: "rgba(140,185,255,0.5)",
+                animation: "hero-fadein-left 0.7s ease 0.72s both",
+              }}
+            >
+              {[
+                { icon: "🚀", label: "216% Avg Traffic Increase" },
+                { icon: "🌍", label: "100 Languages" },
+                { icon: "⚡", label: "1 Article Daily" },
+              ].map((s) => (
+                <span
+                  key={s.label}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  {s.icon} {s.label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none" style={{ background:"linear-gradient(0deg,rgba(3,9,24,0.92) 0%,transparent 100%)" }} />
+        {/* Gradient overlay for better text readability on the left */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: "linear-gradient(90deg, rgba(3,9,24,0.4) 0%, rgba(3,9,24,0.1) 50%, transparent 100%)",
+            zIndex: 2,
+          }}
+        />
       </section>
     </>
   );
@@ -688,7 +804,7 @@ function Pricing() {
 // ─── Final CTA ────────────────────────────────────────────────────────────
 function FinalCTA() {
   return (
-    <section className="relative py-32 px-6 text-center overflow-hidden">
+    <section className="relative py-32 px-6 text-center ">
       <div
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
         style={{ opacity: 0.4 }}
@@ -808,12 +924,8 @@ export default function Home() {
         html { scroll-behavior: smooth; }
       `}</style>
 
-      <div
-        className="relative min-h-screen"
-        style={{ background: "linear-gradient(180deg, #020b18 0%, #030e20 50%, #060818 100%)" }}
-      >
-        <StarField />
-        <FloatingOrbs />
+      <CosmicBackgroundWrapper>
+
         <Nav />
         <Hero />
         <HowItWorks />
@@ -822,7 +934,7 @@ export default function Home() {
         <Pricing />
         <FinalCTA />
         <Footer />
-      </div>
+      </CosmicBackgroundWrapper>
     </>
   );
 }

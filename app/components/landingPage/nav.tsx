@@ -297,7 +297,7 @@ export default function Nav() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              AutoSEO
+              Blob1
             </span>
           </div>
 
