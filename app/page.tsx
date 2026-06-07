@@ -711,7 +711,7 @@ function Testimonials() {
       name: "Sarah Chen",
       role: "E-commerce · Singapore",
       quote:
-        "Within 60 days, my Shopify store started ranking for terms I never thought possible. AutoSEO is the real deal.",
+        "Within 60 days, my Shopify store started ranking for terms I never thought possible. Blog1 is the real deal.",
       flag: "🇸🇬",
     },
   ];
@@ -1006,13 +1006,13 @@ function Footer() {
           WebkitTextFillColor: "transparent",
         }}
       >
-        AutoSEO
+        Blog1
       </div>
       <p
         className="text-xs text-blue-400/30"
         style={{ fontFamily: "'Space Mono', monospace" }}
       >
-        © 2026 AutoSEO · Dominate ChatGPT, Perplexity & Google on autopilot.
+        © 2026 Blog1 · Dominate ChatGPT, Perplexity & Google on autopilot.
       </p>
     </footer>
   );
