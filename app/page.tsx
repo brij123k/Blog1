@@ -440,78 +440,204 @@ function HowItWorks() {
   ];
 
   return (
-    <section id="how-it-works" className="relative py-32 px-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-20">
-          <p
-            className="text-xs text-blue-400 mb-3 tracking-widest"
-            style={{ fontFamily: "'Space Mono', monospace" }}
-          >
-            — THE PROCESS —
-          </p>
-          <h2
-            className="text-4xl md:text-5xl font-black"
-            style={{
-              fontFamily: "'Orbitron', monospace",
-              background: "linear-gradient(90deg, #93c5fd, #e879f9)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            How It Works
-          </h2>
-        </div>
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes glow-pulse-slow {
+          0%, 100% {
+            opacity: 0.3;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.6;
+            transform: scale(1.05);
+          }
+        }
+        
+        .step-card {
+          animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+      `}</style>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {steps.map((step, i) => (
+      <section 
+        id="how-it-works" 
+        className="relative py-24 px-6 overflow-hidden"
+        style={{ background: "transparent" }}
+      >
+        {/* Subtle background glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at 50% 30%, rgba(59,130,246,0.08), transparent 70%)",
+          }}
+        />
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          {/* Section Header - Matching hero badge style */}
+          <div className="text-center mb-16">
             <div
-              key={i}
-              className="relative p-6 rounded-2xl border group transition-all duration-500 hover:-translate-y-2"
+              className="inline-flex items-center gap-2 mb-6"
               style={{
-                background: "rgba(10,18,35,0.7)",
-                borderColor: `${step.color}25`,
-                backdropFilter: "blur(12px)",
-                boxShadow: `0 0 30px ${step.color}10`,
-                animationDelay: `${i * 0.15}s`,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.boxShadow = `0 0 40px ${step.color}30`;
-                (e.currentTarget as HTMLElement).style.borderColor = `${step.color}50`;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.boxShadow = `0 0 30px ${step.color}10`;
-                (e.currentTarget as HTMLElement).style.borderColor = `${step.color}25`;
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 11,
+                color: "rgba(160,205,255,0.85)",
+                border: "1px solid rgba(100,160,255,0.22)",
+                borderRadius: 999,
+                padding: "6px 16px",
+                background: "rgba(30,65,170,0.15)",
+                backdropFilter: "blur(10px)",
               }}
             >
-              <div
-                className="text-3xl mb-4 w-12 h-12 flex items-center justify-center rounded-xl"
-                style={{ background: `${step.color}18` }}
-              >
-                {step.icon}
-              </div>
-              <div
-                className="text-xs font-bold mb-2"
-                style={{ color: step.color, fontFamily: "'Space Mono', monospace" }}
-              >
-                {step.num}
-              </div>
-              <h3
-                className="text-lg font-bold text-white mb-3"
-                style={{ fontFamily: "'Orbitron', monospace" }}
-              >
-                {step.title}
-              </h3>
-              <p
-                className="text-sm text-blue-200/50 leading-relaxed"
-                style={{ fontFamily: "'Space Mono', monospace" }}
-              >
-                {step.desc}
-              </p>
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#60a5fa",
+                  display: "inline-block",
+                  animation: "dot-pulse 2s ease-in-out infinite",
+                }}
+              />
+              — THE PROCESS —
             </div>
-          ))}
+
+            <h2
+              className="text-4xl md:text-5xl lg:text-6xl font-black mb-4"
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                background: "linear-gradient(135deg, #ffffff 0%, #93c5fd 50%, #c084fc 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                letterSpacing: "0.02em",
+              }}
+            >
+              How It Works
+            </h2>
+            
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "clamp(14px, 3vw, 16px)",
+                color: "rgba(200,225,255,0.5)",
+                maxWidth: 500,
+                margin: "0 auto",
+              }}
+            >
+              Simple 4-step process to dominate search results
+            </p>
+          </div>
+
+          {/* Steps Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+            {steps.map((step, i) => (
+              <div
+                key={i}
+                className="step-card relative rounded-2xl border transition-all duration-500 hover:-translate-y-2 group"
+                style={{
+                  background: "rgba(6,16,48,0.5)",
+                  borderColor: `${step.color}25`,
+                  backdropFilter: "blur(16px)",
+                  boxShadow: `0 0 30px ${step.color}10`,
+                  animationDelay: `${i * 0.15}s`,
+                  padding: "28px 20px",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = `0 0 50px ${step.color}30`;
+                  (e.currentTarget as HTMLElement).style.borderColor = `${step.color}60`;
+                  (e.currentTarget as HTMLElement).style.background = `rgba(10,25,60,0.7)`;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = `0 0 30px ${step.color}10`;
+                  (e.currentTarget as HTMLElement).style.borderColor = `${step.color}25`;
+                  (e.currentTarget as HTMLElement).style.background = `rgba(6,16,48,0.5)`;
+                }}
+              >
+                {/* Step Number Background */}
+                <div
+                  className="absolute top-4 right-4 text-6xl font-black opacity-10 pointer-events-none"
+                  style={{
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    color: step.color,
+                  }}
+                >
+                  {step.num}
+                </div>
+
+                {/* Icon Container */}
+                <div
+                  className="text-3xl mb-5 w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+                  style={{
+                    background: `linear-gradient(135deg, ${step.color}20, ${step.color}08)`,
+                    border: `1px solid ${step.color}30`,
+                  }}
+                >
+                  {step.icon}
+                </div>
+
+                {/* Step Number Label */}
+                <div
+                  className="text-xs font-bold mb-3 tracking-wider"
+                  style={{ 
+                    color: step.color, 
+                    fontFamily: "'Space Mono', monospace",
+                  }}
+                >
+                  STEP {step.num}
+                </div>
+
+                {/* Title */}
+                <h3
+                  className="text-xl font-bold text-white mb-3"
+                  style={{ 
+                    fontFamily: "'Orbitron', monospace",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {step.title}
+                </h3>
+
+                {/* Description */}
+                <p
+                  className="text-sm text-blue-200/50 leading-relaxed"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                >
+                  {step.desc}
+                </p>
+
+                {/* Decorative line */}
+                <div
+                  className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-0.5 bg-gradient-to-r from-transparent via-step-color to-transparent transition-all duration-500 group-hover:w-3/4"
+                  style={{ 
+                    background: `linear-gradient(90deg, transparent, ${step.color}, transparent)`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Connecting line between steps (visible on desktop) */}
+          <div className="hidden lg:block absolute left-0 right-0 top-1/2 pointer-events-none" style={{ zIndex: 0 }}>
+            <div
+              className="w-full h-px"
+              style={{
+                background: "linear-gradient(90deg, transparent, rgba(59,130,246,0.2), rgba(139,92,246,0.2), rgba(236,72,153,0.2), transparent)",
+              }}
+            />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 

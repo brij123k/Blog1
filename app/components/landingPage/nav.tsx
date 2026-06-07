@@ -61,10 +61,10 @@ function OrbitalLogo() {
 }
 
 // ── Animated underline indicator for active link ───────────────────────────
-function NavLink({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function NavLink({ label, active, onClick, link }: { label: string; active: boolean; onClick: () => void; link: string }) {
   return (
     <a
-      href="#"
+      href={link}
       onClick={(e) => { e.preventDefault(); onClick(); }}
       className="relative group"
       style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, textDecoration: "none" }}
@@ -115,7 +115,7 @@ function NavLink({ label, active, onClick }: { label: string; active: boolean; o
 // ── Mobile menu ────────────────────────────────────────────────────────────
 function MobileMenu({ open, links, active, setActive, onClose }: {
   open: boolean;
-  links: string[];
+  links: { label: string; link: string }[];
   active: string;
   setActive: (l: string) => void;
   onClose: () => void;
@@ -165,15 +165,15 @@ function MobileMenu({ open, links, active, setActive, onClose }: {
           <circle cx="200" cy="0" r="75" fill="none" stroke="#e879f9" strokeWidth="0.8" strokeDasharray="3 7" />
         </svg>
 
-        {links.map((l, i) => (
+        {links.map((linkItem, i) => (
           <a
-            key={l}
-            href="#"
-            onClick={(e) => { e.preventDefault(); setActive(l); onClose(); }}
+            key={linkItem.label}
+            href={linkItem.link}
+            onClick={(e) => { e.preventDefault(); setActive(linkItem.label); onClose(); }}
             style={{
               fontFamily: "'Space Mono', monospace",
               fontSize: 18,
-              color: active === l ? "#93c5fd" : "rgba(200,220,255,0.65)",
+              color: active === linkItem.label ? "#93c5fd" : "rgba(200,220,255,0.65)",
               textDecoration: "none",
               padding: "14px 0",
               borderBottom: "1px solid rgba(59,130,246,0.08)",
@@ -184,8 +184,8 @@ function MobileMenu({ open, links, active, setActive, onClose }: {
               animation: open ? `nav-mobile-item 0.4s ease ${0.05 + i * 0.06}s both` : "none",
             }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: active === l ? "#3b82f6" : "rgba(59,130,246,0.3)", flexShrink: 0, boxShadow: active === l ? "0 0 8px #3b82f6" : "none", transition: "all 0.2s" }} />
-            {l}
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: active === linkItem.label ? "#3b82f6" : "rgba(59,130,246,0.3)", flexShrink: 0, boxShadow: active === linkItem.label ? "0 0 8px #3b82f6" : "none", transition: "all 0.2s" }} />
+            {linkItem.label}
           </a>
         ))}
 
@@ -208,7 +208,12 @@ export default function Nav() {
   const [active, setActive] = useState("How It Works");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [ctaHover, setCtaHover] = useState(false);
-  const links = ["How It Works", "Pricing", "Case Studies", "About"];
+  const links = [
+    { label: "How It Works", link: "#" },
+    { label: "Pricing", link: "#" },
+    { label: "Case Studies", link: "#" },
+    { label: "About", link: "#" }
+  ];
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -310,7 +315,7 @@ export default function Nav() {
             <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 1, background: "linear-gradient(90deg,transparent,rgba(59,130,246,0.08),rgba(139,92,246,0.08),transparent)", transform: "translateY(-50%)", pointerEvents: "none" }} />
 
             {links.map((l) => (
-              <NavLink key={l} label={l} active={active === l} onClick={() => setActive(l)} />
+              <NavLink key={l.label} label={l.label} link={l.link} active={active === l.label} onClick={() => setActive(l.label)} />
             ))}
           </div>
 

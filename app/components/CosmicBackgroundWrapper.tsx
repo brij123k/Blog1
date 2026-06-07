@@ -65,14 +65,14 @@ function CosmicBackground() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // const handleMouseMove = (e: MouseEvent) => {
-    //   setMousePosition({
-    //     x: e.clientX / window.innerWidth,
-    //     y: e.clientY / window.innerHeight,
-    //   });
-    // };
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({
+        x: e.clientX / window.innerWidth,
+        y: e.clientY / window.innerHeight,
+      });
+    };
 
-    // window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove);
 
     const resize = () => {
       canvas.width = window.innerWidth;
