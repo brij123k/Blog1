@@ -209,8 +209,8 @@ export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [ctaHover, setCtaHover] = useState(false);
   const links = [
-    { label: "How It Works", link: "#" },
-    { label: "Pricing", link: "#" },
+    { label: "How It Works", link: "#how-it-works" },
+    { label: "Pricing", link: "#pricing" },
     { label: "Case Studies", link: "#" },
     { label: "About", link: "#" }
   ];

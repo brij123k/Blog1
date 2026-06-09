@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import CosmicBackgroundWrapper from "../components/CosmicBackgroundWrapper";
 
 function WelcomePage() {
   const router = useRouter();
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showOtherInput, setShowOtherInput] = useState(false);
-  const [otherCountry, setOtherCountry] = useState("");
+  const [otherCountries, setOtherCountries] = useState<string[]>([]);
+  const [currentOtherInput, setCurrentOtherInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const countries = [
     { code: "us", name: "United States", flag: "🇺🇸" },
@@ -25,6 +28,26 @@ function WelcomePage() {
     { code: "mx", name: "Mexico", flag: "🇲🇽" },
   ];
 
+  // Load cached data on mount
+  useEffect(() => {
+    const cachedCountries = localStorage.getItem("userCountries");
+    if (cachedCountries) {
+      const parsed = JSON.parse(cachedCountries);
+      // Separate predefined countries from custom ones
+      const predefined = parsed.filter((c: string) => 
+        countries.some(country => country.name === c)
+      );
+      const custom = parsed.filter((c: string) => 
+        !countries.some(country => country.name === c)
+      );
+      setSelectedCountries(predefined);
+      setOtherCountries(custom);
+      if (custom.length > 0) {
+        setShowOtherInput(true);
+      }
+    }
+  }, []);
+
   const toggleCountry = (countryName: string) => {
     if (selectedCountries.includes(countryName)) {
       setSelectedCountries(selectedCountries.filter(c => c !== countryName));
@@ -33,22 +56,31 @@ function WelcomePage() {
     }
   };
 
-  const handleOtherToggle = () => {
-    if (!showOtherInput) {
-      setShowOtherInput(true);
-    } else {
-      setShowOtherInput(false);
-      setOtherCountry("");
-      setSelectedCountries(selectedCountries.filter(c => c !== otherCountry));
+  const handleAddOtherCountry = () => {
+    const trimmed = currentOtherInput.trim();
+    if (trimmed && !otherCountries.includes(trimmed)) {
+      setOtherCountries([...otherCountries, trimmed]);
+      setCurrentOtherInput("");
+      // Keep input focused for adding more countries
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  };
+
+  const handleRemoveOtherCountry = (country: string) => {
+    setOtherCountries(otherCountries.filter(c => c !== country));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddOtherCountry();
     }
   };
 
   const handleContinue = async () => {
-    let allCountries = [...selectedCountries];
-    
-    if (showOtherInput && otherCountry.trim()) {
-      allCountries.push(otherCountry.trim());
-    }
+    const allCountries = [...selectedCountries, ...otherCountries];
 
     if (allCountries.length === 0) {
       alert("Please select at least one country");
@@ -64,12 +96,16 @@ function WelcomePage() {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Navigate to /course page
-    router.push("/course");
+    router.push("/portal");
     setIsSubmitting(false);
   };
 
+  const handleSkip = () => {
+    router.push("/portal");
+  };
+
   return (
-    <>
+    <CosmicBackgroundWrapper>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -137,6 +173,17 @@ function WelcomePage() {
           }
         }
 
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
         .rocket-icon {
           animation: float-rocket 6s ease-in-out infinite;
           filter: drop-shadow(0 0 20px rgba(59,130,246,0.5));
@@ -155,9 +202,13 @@ function WelcomePage() {
           border-radius: 50%;
           animation: spin-slow 20s linear infinite;
         }
+
+        .country-badge {
+          animation: slideIn 0.2s ease-out;
+        }
       `}</style>
 
-      <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(180deg, #020b18 0%, #030e20 50%, #060818 100%)" }}>
+      <div className="min-h-screen relative overflow-hidden transparent">
         {/* Stars Background */}
         <div className="absolute inset-0 pointer-events-none">
           {[...Array(50)].map((_, i) => (
@@ -399,7 +450,7 @@ function WelcomePage() {
               {/* Other Country Option */}
               <div className="mb-8 relative z-10">
                 <button
-                  onClick={handleOtherToggle}
+                  onClick={() => setShowOtherInput(!showOtherInput)}
                   className={`flex items-center gap-3 p-3 rounded-xl border transition-all duration-300 w-full ${
                     showOtherInput
                       ? "border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/20"
@@ -407,29 +458,72 @@ function WelcomePage() {
                   }`}
                 >
                   <span className="text-2xl">🌍</span>
-                  <span className="text-white text-sm font-medium">Other Country</span>
+                  <span className="text-white text-sm font-medium">Add Other Countries</span>
                   {showOtherInput && (
-                    <span className="ml-auto text-purple-400 text-sm">✓</span>
+                    <span className="ml-auto text-purple-400 text-sm">▼</span>
                   )}
                 </button>
 
-                {/* Other Country Input */}
+                {/* Other Country Input Section */}
                 {showOtherInput && (
                   <div className="mt-4 animate-fadeIn">
-                    <input
-                      type="text"
-                      value={otherCountry}
-                      onChange={(e) => setOtherCountry(e.target.value)}
-                      placeholder="Enter your country name"
-                      className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-purple-500 focus:outline-none transition-all"
-                      autoFocus
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={currentOtherInput}
+                        onChange={(e) => setCurrentOtherInput(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Type country name and press Enter"
+                        className="flex-1 p-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-purple-500 focus:outline-none transition-all"
+                      />
+                      <button
+                        onClick={handleAddOtherCountry}
+                        disabled={!currentOtherInput.trim()}
+                        className={`px-6 rounded-xl font-mono text-sm transition-all ${
+                          currentOtherInput.trim()
+                            ? "bg-purple-500/20 border border-purple-500 text-purple-300 hover:bg-purple-500/30"
+                            : "bg-white/5 border border-white/10 text-white/30 cursor-not-allowed"
+                        }`}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    
+                    <p className="text-white/30 text-xs font-mono mt-2">
+                      Press Enter or click Add to add multiple countries
+                    </p>
+
+                    {/* Added Other Countries List */}
+                    {otherCountries.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-white/40 text-xs font-mono mb-2 flex items-center gap-2">
+                          <span>🌍</span> ADDED COUNTRIES:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {otherCountries.map((country, index) => (
+                            <span
+                              key={index}
+                              className="country-badge px-3 py-1.5 rounded-full bg-purple-500/20 text-purple-300 text-sm flex items-center gap-2"
+                            >
+                              {country}
+                              <button
+                                onClick={() => handleRemoveOtherCountry(country)}
+                                className="hover:text-white transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Selected Countries Summary */}
-              {(selectedCountries.length > 0 || (showOtherInput && otherCountry)) && (
+              {(selectedCountries.length > 0 || otherCountries.length > 0) && (
                 <div
                   className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10 relative z-10"
                   style={{
@@ -437,7 +531,7 @@ function WelcomePage() {
                   }}
                 >
                   <p className="text-white/40 text-xs font-mono mb-2 flex items-center gap-2">
-                    <span>🚀</span> SELECTED COUNTRIES:
+                    <span>🚀</span> ALL SELECTED COUNTRIES:
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {selectedCountries.map((country) => (
@@ -448,11 +542,14 @@ function WelcomePage() {
                         {country}
                       </span>
                     ))}
-                    {showOtherInput && otherCountry && (
-                      <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-sm flex items-center gap-1">
-                        🌍 {otherCountry}
+                    {otherCountries.map((country, index) => (
+                      <span
+                        key={`other-${index}`}
+                        className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-sm flex items-center gap-1"
+                      >
+                        🌍 {country}
                       </span>
-                    )}
+                    ))}
                   </div>
                 </div>
               )}
@@ -460,9 +557,9 @@ function WelcomePage() {
               {/* Continue Button */}
               <button
                 onClick={handleContinue}
-                disabled={isSubmitting || (selectedCountries.length === 0 && !(showOtherInput && otherCountry))}
+                disabled={isSubmitting || (selectedCountries.length === 0 && otherCountries.length === 0)}
                 className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 relative overflow-hidden group ${
-                  isSubmitting || (selectedCountries.length === 0 && !(showOtherInput && otherCountry))
+                  isSubmitting || (selectedCountries.length === 0 && otherCountries.length === 0)
                     ? "opacity-50 cursor-not-allowed"
                     : "hover:scale-105 active:scale-95"
                 }`}
@@ -481,14 +578,14 @@ function WelcomePage() {
                     Setting up...
                   </div>
                 ) : (
-                  "Continue to Course →"
+                  "Continue →"
                 )}
               </button>
 
               {/* Skip Option */}
               <p className="text-center mt-6">
                 <button
-                  onClick={() => router.push("/course")}
+                  onClick={handleSkip}
                   className="text-white/30 text-sm font-mono hover:text-white/50 transition-colors flex items-center justify-center gap-2 mx-auto"
                 >
                   <span>✨</span> Skip for now <span>✨</span>
@@ -515,7 +612,7 @@ function WelcomePage() {
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
-    </>
+    </CosmicBackgroundWrapper>
   );
 }
 
