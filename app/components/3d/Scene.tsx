@@ -20,9 +20,11 @@ function PostProcessing() {
   const { gl, scene, camera, size } = useThree();
 
   useEffect(() => {
-    // Lazy-import to avoid SSR issues
-    let composer: import("three/examples/jsm/postprocessing/EffectComposer.js").EffectComposer;
-    let animId: number;
+    let composer:
+| import("three/examples/jsm/postprocessing/EffectComposer.js").EffectComposer
+| undefined;
+
+let animId: number | undefined;
 
     const setup = async () => {
       const { EffectComposer } = await import("three/examples/jsm/postprocessing/EffectComposer.js");
