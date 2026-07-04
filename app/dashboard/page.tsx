@@ -1,1130 +1,2034 @@
 "use client";
 
-import React, {
-  useState, useEffect, useRef, useCallback, useMemo,
-} from "react";
+import React, { useState, useRef, useEffect, useCallback, FC, MouseEvent } from "react";
+import ApiService from "../lib/service";
+import ApiConfig from "../lib/apiConfig";
+import BlogEditorModal from "../../components/BlogEditorModal";
+import CollectionModal from "../../components/CollectionModal";
+import ProductModal from "../../components/ProductModal";
+import CompetitorDetailModal from "../../components/CompetitorDetailModal";
+import SeasonalModal from "../../components/SeasonalModal";
+import CulturalModal from "../../components/CulturalModal";
+import RetailModal from "../../components/RetailModal";
+import ExperientialModal from "../../components/ExperientialModal";
+import ShortTailKeywordsModal from "../../components/ShortTailKeywordsModal";
+import LongTailKeywordsModal from "../../components/LongTailKeywordsModal";
 
-/* ═══════════════════════════════════════════════════════════
-   TYPES
-═══════════════════════════════════════════════════════════ */
-type MainTab = "store" | "competitor" | "calendar" | "keywords" | "searchconsole";
-type StoreTab = "collections" | "products";
-type CompetitorId = "comp1" | "comp2" | "comp3" | "comp4" | "comp5";
+// ============================================================================
+// Types
+// ============================================================================
 
-/* ═══════════════════════════════════════════════════════════
-   MOCK DATA
-═══════════════════════════════════════════════════════════ */
-const COLLECTIONS = [
-  { id: "c1", name: "Best Sellers", count: 24 },
-  { id: "c2", name: "New Arrivals", count: 12 },
-  { id: "c3", name: "Summer Collection", count: 18 },
-  { id: "c4", name: "Winter Essentials", count: 15 },
-  { id: "c5", name: "Limited Edition", count: 8 },
-  { id: "c6", name: "Flash Sale", count: 33 },
-];
+interface StoreData {
+  _id: string;
+  integrationId: string;
+  shopDomain: string;
+  niche: string;
+  businessSummary: string;
+  targetAudience: string;
+  brandVoice: string;
+  language: string;
+  primaryMarket: string;
+  shortTailKeywords: string[];
+  longTailKeywords: string[];
+  competitors: Array<{
+    name: string;
+    website: string;
+    description: string;
+    strengths: string[];
+    weaknesses: string[];
+  }>;
+  blogTopics: Array<{
+    title: string;
+    keyword: string;
+    intent: string;
+    difficulty: string;
+    priority: number;
+  }>;
+  customerPainPoints: string[];
+  customerGoals: string[];
+  faqIdeas: string[];
+  seoSuggestions: string[];
+  contentPillars: string[];
+  aiRecommendations: string[];
+  lastAnalyzedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
 
-const PRODUCTS: Record<string, { id: string; name: string; price: string }[]> = {
-  c1: [
-    { id: "p1", name: "Wireless Headphones Pro", price: "$129" },
-    { id: "p2", name: "Smart Watch Ultra", price: "$299" },
-    { id: "p3", name: "Laptop Backpack Elite", price: "$89" },
-  ],
-  c2: [
-    { id: "p4", name: "Ultra HD Camera X1", price: "$449" },
-    { id: "p5", name: "Wireless Mouse M3", price: "$49" },
-  ],
-  c3: [
-    { id: "p6", name: "Portable Speaker Mini", price: "$79" },
-    { id: "p7", name: "Beach Tote Bag", price: "$39" },
-    { id: "p8", name: "Sunglasses Pro", price: "$59" },
-  ],
-  c4: [
-    { id: "p9", name: "Thermal Flask 1L", price: "$35" },
-    { id: "p10", name: "Insulated Jacket", price: "$199" },
-  ],
-  c5: [
-    { id: "p11", name: "Gold Edition Watch", price: "$599" },
-    { id: "p12", name: "Carbon Fiber Case", price: "$149" },
-  ],
-  c6: [
-    { id: "p13", name: "Bundle Deal A", price: "$199" },
-    { id: "p14", name: "Bundle Deal B", price: "$149" },
-    { id: "p15", name: "Clearance Mix", price: "$29" },
-  ],
-};
+interface Topic {
+  id: string;
+  name: string;
+  keyword: string;
+  intent: string;
+  difficulty: string;
+  priority: number;
+}
 
-const COMPETITORS: Record<CompetitorId, { name: string; domain: string; da: number; traffic: string; keywords: number; topPages: string[]; weaknesses: string[] }> = {
-  comp1: { name: "TechGadgetHub", domain: "techgadgethub.com", da: 48, traffic: "142k/mo", keywords: 3200, topPages: ["/wireless-headphones", "/smart-watches", "/laptop-bags"], weaknesses: ["Thin blog content", "No video SEO", "Slow mobile load"] },
-  comp2: { name: "GearZone", domain: "gearzone.io", da: 52, traffic: "98k/mo", keywords: 2800, topPages: ["/cameras", "/accessories", "/deals"], weaknesses: ["Outdated schema markup", "Weak backlink profile", "No AEO content"] },
-  comp3: { name: "ElectroMart", domain: "electromart.co", da: 61, traffic: "310k/mo", keywords: 8100, topPages: ["/sale", "/premium-audio", "/wearables"], weaknesses: ["Low content frequency", "No email capture", "Thin category pages"] },
-  comp4: { name: "PixelDrop", domain: "pixeldrop.store", da: 34, traffic: "41k/mo", keywords: 980, topPages: ["/cameras", "/lenses"], weaknesses: ["Very low DA", "No social presence", "No structured data"] },
-  comp5: { name: "UrbanCarry", domain: "urbancarry.com", da: 44, traffic: "67k/mo", keywords: 1540, topPages: ["/bags", "/travel-gear"], weaknesses: ["No blog strategy", "Weak UX on mobile", "No GEO content"] },
-};
+interface Product {
+  id: string;
+  title: string;
+  handle: string;
+  status: string;
+  image: string | null;
+  price: string;
+  currency: string;
+}
 
-const COUNTRIES = ["United States", "United Kingdom", "India", "Australia", "Canada", "Germany", "France", "UAE"];
+type BlogStatus = "none" | "draft" | "sched" | "pub";
 
-const FESTIVALS: Record<string, string[]> = {
-  "United States": ["New Year's Day", "Valentine's Day", "Independence Day", "Halloween", "Thanksgiving", "Christmas", "Black Friday", "Cyber Monday", "Super Bowl Sunday", "Memorial Day"],
-  "United Kingdom": ["New Year's Day", "Valentine's Day", "Easter", "Guy Fawkes Night", "Christmas", "Boxing Day", "Mother's Day UK", "Father's Day UK"],
-  "India": ["Diwali", "Holi", "Eid ul-Fitr", "Dussehra", "Independence Day", "Republic Day", "Navratri", "Pongal", "Christmas", "New Year's Day"],
-  "Australia": ["Australia Day", "Easter", "ANZAC Day", "Christmas", "Boxing Day", "Melbourne Cup", "Valentine's Day", "Halloween"],
-  "Canada": ["Canada Day", "Thanksgiving Canada", "Victoria Day", "Christmas", "Boxing Day", "Valentine's Day", "Halloween", "Remembrance Day"],
-  "Germany": ["Oktoberfest", "Christmas", "Easter", "Carnival (Karneval)", "New Year's Day", "German Unity Day", "Valentine's Day"],
-  "France": ["Bastille Day", "Christmas", "Easter", "Valentine's Day", "New Year's Day", "Armistice Day"],
-  "UAE": ["Eid ul-Fitr", "Eid ul-Adha", "UAE National Day", "New Year's Day", "Prophet's Birthday", "Islamic New Year", "Al Isra' Wal Miraj"],
-};
+interface Blog {
+  id: string;
+  topic: string;
+  title: string;
+  html: string;
+  status?: BlogStatus;
+  heroImageUrl?: string;
+  heroImagePrompt?: string;
+}
 
-const KEYWORDS_DATA = [
-  { kw: "wireless headphones 2024", vol: "18.1k", diff: 42, intent: "Commercial" },
-  { kw: "best smart watch under $300", vol: "9.4k", diff: 38, intent: "Commercial" },
-  { kw: "buy laptop backpack online", vol: "6.2k", diff: 29, intent: "Transactional" },
-  { kw: "portable bluetooth speaker review", vol: "14k", diff: 55, intent: "Informational" },
-  { kw: "waterproof camera 2024", vol: "8.8k", diff: 47, intent: "Commercial" },
-  { kw: "wireless mouse for mac", vol: "5.5k", diff: 31, intent: "Commercial" },
-  { kw: "best tech gifts 2024", vol: "22k", diff: 60, intent: "Informational" },
-  { kw: "noise cancelling headphones deals", vol: "11.2k", diff: 44, intent: "Transactional" },
-];
+type StarKey = "topics" | "products" | "collection" | null;
 
-const SEARCH_CONSOLE_TABS = ["overview", "queries", "pages", "devices"] as const;
-type SCTab = typeof SEARCH_CONSOLE_TABS[number];
+interface BlogStatusConfig {
+  cls: string;
+  label: string;
+}
 
-/* ═══════════════════════════════════════════════════════════
-   CSS
-═══════════════════════════════════════════════════════════ */
+// New: type of knob-triggered info modal (Store / Competitor / Calendar / Keywords)
+type KnobModalType = "store" | "competitor" | "calendar" | "keywords" | null;
+
+// ============================================================================
+// Styles (unchanged except for the product search box)
+// ============================================================================
+
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Hanken+Grotesk:wght@300;400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ebebeb;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 40px 20px;
+  }
+  .stage { width: min(1000px, 92vw); }
+  .lvx-root { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; box-sizing: border-box; }
 
-.db-root {
-  --chassis-1:#1a1f2e; --chassis-2:#141826; --chassis-edge:#252b3a;
-  --panel-1:#1e2433; --panel-2:#181d2c; --panel-line:#252d3f;
-  --screen-1:#0b0d14; --screen-2:#050609;
-  --ink-bright:#eef2f8; --ink-mid:#7e8fa8; --ink-dim:#3a4255;
-  --led-on:#ff5a26; --led-off:#141926;
-  --accent:#3b6fff; --accent-2:#8b5cf6;
-  --sub-panel:#161b28;
+  /* ============ CHASSIS ============ */
+  .pedal {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1400 / 955;
+    container-type: inline-size;
+    --bk: 11.5cqw;
+    --cb: 10.5cqw;
+    --tile: 15.5cqw;
+    --fb: 8.5cqw;
+    --fst: 14cqw;
+    border-radius: 34px;
+    padding: 26px;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,255,255,0.55), transparent 60%),
+      linear-gradient(160deg, #d6d6d4 0%, #c4c4c2 45%, #b9b9b7 100%);
+    box-shadow:
+      0 2px 1px rgba(255,255,255,0.9) inset,
+      0 -2px 2px rgba(0,0,0,0.12) inset,
+      0 40px 70px -20px rgba(0,0,0,0.45),
+      0 12px 24px rgba(0,0,0,0.18);
+  }
+  .pedal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 34px;
+    background-image:
+      radial-gradient(rgba(0,0,0,0.10) 0.5px, transparent 0.6px),
+      radial-gradient(rgba(255,255,255,0.25) 0.5px, transparent 0.6px);
+    background-size: 4px 4px, 5px 5px;
+    background-position: 0 0, 2px 3px;
+    opacity: 0.55;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  .panel-grid {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+  }
+  .knob-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2.4cqw 2.6cqw;
+    flex: 0 0 auto;
+  }
+  .head-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    align-items: start;
+    flex: 0 0 auto;
+  }
+  .head-row > .wide-tile { grid-column: 1; width: 100%;
+    background: linear-gradient(180deg, #e2e4e9 0%, #d0d3da 100%); }
+  .head-row > .screen { grid-column: 2 / 5; }
+  .head-row > .tile:last-child { grid-column: 5; }
+  .head-row .tile { height: 18.5cqw; }
+
+  .wide-tile .duo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2%;
+    width: 100%;
+  }
+  .wide-tile .knob-unit { width: auto; gap: 7px; }
+  .wide-tile .knob { width: 6.4cqw; height: 6.4cqw; }
+  .wide-tile .label { font-size: clamp(8px, 1.3vw, 14px); }
+
+  .knob-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  .knob-row .arrow {
+    position: absolute;
+    top: 40%;
+    transform: translate(-50%, -50%);
+    color: #b8b8b6;
+    font-size: clamp(13px, 2vw, 22px);
+    font-weight: 300;
+  }
+  .knob-row .arrow.l { left: 40%; }
+  .knob-row .arrow.r { left: 60%; }
+
+  .tile {
+    flex: 0 0 auto;
+    width: var(--tile);
+    height: var(--tile);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0 auto;
+  }
+  .tile .knob-unit { gap: 9px; width: 100%; }
+  .tile .knob { width: var(--bk); height: var(--bk); aspect-ratio: 1; }
+  .tile .label { white-space: nowrap; }
+
+  .knob-row .tile, .head-row > .tile:last-child { cursor: pointer; transition: box-shadow .45s ease; }
+  .tile { position: relative; }
+  .tile .knob-unit { position: relative; z-index: 1; }
+
+  .knob-row .tile::before, .head-row > .tile:last-child::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background: radial-gradient(circle at 50% 22%, #3d93ff 0%, #143f9e 52%, #071c4a 100%);
+    opacity: 0;
+    transition: opacity .45s ease;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .knob-row .tile.selected::before,
+  .head-row > .tile:last-child.selected::before { opacity: 1; }
+  .knob-row .tile.selected,
+  .head-row > .tile:last-child.selected {
+    box-shadow:
+      0 0 0 1px rgba(130,195,255,0.6),
+      0 1px 1px rgba(255,255,255,0.3) inset,
+      0 -2px 6px rgba(0,0,0,0.18) inset,
+      0 0 18px rgba(61,147,255,0.65),
+      0 10px 24px rgba(12,47,122,0.5);
+  }
+  .knob-row .tile.selected .label,
+  .head-row > .tile:last-child.selected .label { color: #ffffff; }
+
+  .wide-tile .knob-unit { cursor: pointer; border-radius: 13px; padding: 0.7cqw 1.1cqw; transition: box-shadow .4s ease; }
+  .wide-tile .knob-unit > * { position: relative; z-index: 1; }
+  .wide-tile .knob-unit::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    background: radial-gradient(circle at 50% 25%, #3d93ff 0%, #143f9e 55%, #071c4a 100%);
+    opacity: 0;
+    transition: opacity .4s ease;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .wide-tile .knob-unit.selected::before { opacity: 1; }
+  .wide-tile .knob-unit.selected { box-shadow: 0 0 0 1px rgba(130,195,255,0.6), 0 0 16px rgba(61,147,255,0.6), 0 6px 14px rgba(12,47,122,0.45); }
+  .wide-tile .knob-unit.selected .label { color: #ffffff; }
+
+  .knob-row .tile::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 70%;
+    height: 5cqw;
+    transform: translateX(-50%) scaleY(0);
+    transform-origin: top center;
+    background: linear-gradient(180deg, #0c2f7a 0%, #3d93ff 100%);
+    z-index: 0;
+    pointer-events: none;
+    transition: transform .4s ease .05s;
+  }
+  .knob-row .tile.selected::after { transform: translateX(-50%) scaleY(1); }
+
+  .foot-row { position: relative; }
+  .foot-row::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #1a55c8 0%, #0a2456 48%, #05122f 100%);
+    clip-path: circle(0% at var(--ox, 50%) 0%);
+    transition: clip-path .65s ease .12s;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .foot-row.linked-green::before { clip-path: circle(165% at var(--ox, 50%) 0%); }
+  .foot-row.linked-green {
+    box-shadow:
+      0 0 0 1px rgba(130,195,255,0.5),
+      inset 0 2px 0 rgba(160,205,255,0.5),
+      0 -1px 4px rgba(0,0,0,0.12) inset,
+      0 0 34px rgba(61,147,255,0.4),
+      0 12px 30px rgba(8,28,70,0.6);
+    transition: box-shadow .5s ease;
+  }
+  .foot-row .sw-label, .foot-row .connector,
+  .foot-row .connector .arr, .foot-row .brand { transition: color .5s ease .18s; }
+  .foot-row.linked-green .sw-label,
+  .foot-row.linked-green .connector,
+  .foot-row.linked-green .connector .arr,
+  .foot-row.linked-green .brand { color: #eaf3ff; }
+  .foot-row.linked-green .connector .ln { background: rgba(255,255,255,0.65); }
+  .foot-row.linked-green .brand .box { border-color: rgba(255,255,255,0.6); }
+
+  .face {
+    background: linear-gradient(180deg, #fbfbfa 0%, #f1f1ef 100%);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 1px rgba(255,255,255,0.9) inset,
+      0 -1px 3px rgba(0,0,0,0.06) inset,
+      0 6px 14px rgba(0,0,0,0.10);
+  }
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    padding: 6% 0;
+  }
+  .side-panel .knob-unit { width: 100%; }
+  .knob-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 11px;
+  }
+  .label {
+    font-size: clamp(9px, 1.55vw, 16px);
+    color: #6f6f6d;
+    font-weight: 400;
+    letter-spacing: 0.2px;
+  }
+
+  /* ============ KNOBS ============ */
+  .knob {
+    position: relative;
+    border-radius: 50%;
+  }
+  .knob .ticks {
+    position: absolute;
+    inset: -13%;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .knob .ticks .tick {
+    position: absolute;
+    inset: 0;
+  }
+  .knob .ticks .tick::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 50%;
+    width: 2px; height: 2px;
+    margin-left: -1px;
+    background: #a8a8a6;
+    border-radius: 50%;
+  }
+  .knob .pointer {
+    position: absolute;
+    bottom: 50%; left: 50%;
+    width: 3px;
+    height: 35%;
+    border-radius: 3px;
+    transform-origin: 50% 100%;
+    z-index: 3;
+  }
+
+  .knob.white {
+    position: relative;
+    background:
+      radial-gradient(circle at 50% 34%, rgba(255,255,255,0.92), rgba(255,255,255,0) 46%),
+      conic-gradient(from 0deg,
+        #cfcfcd, #f3f3f1 11%, #c2c2c0 24%, #efefed 37%,
+        #bdbdbb 50%, #efefed 63%, #c2c2c0 76%, #f3f3f1 89%, #cfcfcd),
+      radial-gradient(circle at 50% 50%, #dcdcda, #a6a6a4 100%);
+    box-shadow:
+      0 1px 2px rgba(255,255,255,0.85) inset,
+      0 -2px 5px rgba(0,0,0,0.28) inset,
+      0 5px 12px rgba(0,0,0,0.22),
+      0 2px 4px rgba(0,0,0,0.15);
+  }
+  .knob.white::after {
+    content: "";
+    position: absolute; inset: 24%;
+    border-radius: 50%;
+    background:
+      conic-gradient(from 90deg, #e4e4e2, #fafaf8 25%, #cacac8 50%, #fafaf8 75%, #e4e4e2),
+      radial-gradient(circle at 50% 35%, #fbfbfb, #c8c8c6 75%, #b4b4b2 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.22) inset, 0 -1px 2px rgba(255,255,255,0.8) inset;
+    z-index: 1;
+  }
+  .knob.white .pointer { display: none; }
+
+  #kPreview, #kGenerator, #kMix {
+    background:
+      radial-gradient(circle at 50% 34%, rgba(190,215,255,0.95), rgba(255,255,255,0) 46%),
+      conic-gradient(from 0deg,
+        #3f72c4, #79a8ff 11%, #2b5aa6 24%, #6294ec 37%,
+        #21478e 50%, #6294ec 63%, #2b5aa6 76%, #79a8ff 89%, #3f72c4),
+      radial-gradient(circle at 50% 50%, #4f86d6, #173b80 100%);
+    box-shadow:
+      0 1px 2px rgba(200,225,255,0.7) inset,
+      0 -2px 6px rgba(0,0,0,0.35) inset,
+      0 5px 12px rgba(10,40,110,0.4),
+      0 2px 4px rgba(0,0,0,0.2),
+      0 0 16px rgba(61,147,255,0.45);
+  }
+  #kPreview::after, #kGenerator::after, #kMix::after {
+    background:
+      conic-gradient(from 90deg, #5a8de0, #a7c6ff 25%, #3b6cc0 50%, #a7c6ff 75%, #5a8de0),
+      radial-gradient(circle at 50% 35%, #cfe0ff, #4f86d6 75%, #2a5aa8 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3) inset, 0 -1px 2px rgba(200,225,255,0.7) inset;
+  }
+
+  .head-row > .wide-tile,
+  .head-row > .tile:last-child,
+  .knob-row .tile {
+    background: linear-gradient(180deg, #3c3d42 0%, #2a2b2f 100%);
+    box-shadow:
+      0 1px 1px rgba(255,255,255,0.06) inset,
+      0 -3px 8px rgba(0,0,0,0.35) inset,
+      0 6px 16px rgba(0,0,0,0.30),
+      0 1px 2px rgba(0,0,0,0.25);
+  }
+  .wide-tile .label,
+  .head-row > .tile:last-child .label,
+  .knob-row .tile .label { color: #cfd2da; }
+
+  .knob.black {
+    background:
+      radial-gradient(circle at 50% 34%, rgba(190,215,255,0.9), rgba(255,255,255,0) 46%),
+      conic-gradient(from 0deg,
+        #3f72c4, #79a8ff 11%, #2b5aa6 24%, #6294ec 37%,
+        #21478e 50%, #6294ec 63%, #2b5aa6 76%, #79a8ff 89%, #3f72c4),
+      radial-gradient(circle at 50% 50%, #4f86d6, #173b80 100%);
+    box-shadow:
+      0 1px 2px rgba(200,225,255,0.65) inset,
+      0 -3px 7px rgba(0,0,0,0.4) inset,
+      0 6px 14px rgba(10,40,110,0.45),
+      0 2px 4px rgba(0,0,0,0.25);
+  }
+      .keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
 }
-.db-root*{box-sizing:border-box;margin:0;padding:0}
-.db-root{
-  font-family:'Hanken Grotesk',sans-serif;
-  min-height:100vh;
-  display:flex; align-items:flex-start; justify-content:center;
-  padding:28px 16px 48px;
-  -webkit-font-smoothing:antialiased;
-  color:var(--ink-bright);
-  position:relative; z-index:1;
+.competitor-detail-card {
+  animation: pop 0.25s ease;
 }
 
-/* ── CHASSIS ── */
-.db-chassis{
-  width:100%; max-width:1080px; position:relative;
-  background:linear-gradient(175deg,var(--chassis-1) 0%,var(--chassis-2) 100%);
-  border-radius:28px; padding:20px 20px 36px;
+  .knob.black::before { display: none; }
+  .knob.black .ticks { display: none; }
+  .knob.black::after {
+    content: "";
+    position: absolute; inset: 24%;
+    border-radius: 50%;
+    background:
+      conic-gradient(from 90deg, #5a8de0, #a7c6ff 25%, #3b6cc0 50%, #a7c6ff 75%, #5a8de0),
+      radial-gradient(circle at 50% 35%, #cfe0ff, #4f86d6 75%, #2a5aa8 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3) inset, 0 -1px 2px rgba(200,225,255,0.7) inset;
+    z-index: 1;
+  }
+  .knob.black .pointer { display: none; }
+
+  .knob.lg { width: 56%; aspect-ratio: 1; }
+  .knob.sm { width: 60%; aspect-ratio: 1; }
+  .knob.black { width: var(--bk); height: var(--bk); aspect-ratio: 1; }
+
+  /* ============ DISPLAY ============ */
+  .display-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .screen {
+    height: 24cqw;
+    border-radius: 16px;
+    background:
+      radial-gradient(120% 90% at 50% 0%, #232325 0%, #141416 55%, #0a0a0b 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4% 5%;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.4),
+      0 4px 12px rgba(0,0,0,0.3) inset;
+    overflow: hidden;
+  }
+  .screen::after {
+    content:"";
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), transparent 30%);
+    pointer-events:none;
+  }
+
+  .vu {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    width: 11%;
+    height: 60%;
+    align-self: flex-start;
+    margin-top: 4%;
+  }
+  .vu .dot {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: rgba(220,220,220,0.85);
+  }
+  .vu .dot.off { background: rgba(120,120,120,0.22); }
+
+  .screen-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    flex: 1;
+  }
+  .logo { margin-bottom: 2px; line-height: 0; }
+  .logo svg { display:block; width: clamp(20px,3vw,30px); height:auto; }
+
+  .preset-name {
+    color: #f2f2f2;
+    font-size: clamp(15px, 2.7vw, 28px);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+  }
+  .preset-num {
+    color: #f2f2f2;
+    font-size: clamp(14px, 2.4vw, 24px);
+    font-weight: 400;
+    border: 1.5px solid rgba(230,230,230,0.55);
+    border-radius: 7px;
+    padding: 2px 14px;
+    letter-spacing: 1px;
+  }
+
+  .pitch {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 4%;
+    height: 100%;
+  }
+  .pitch.right { align-items: flex-end; text-align: right; }
+  .pitch .vu { align-self: auto; margin: 0; }
+  .pitch .meta { line-height: 1.25; }
+  .pitch .val { color: #8a8a8a; font-size: clamp(10px,1.5vw,15px); font-weight:400; }
+  .pitch .cap { color: #cfcfcf; font-size: clamp(10px,1.55vw,16px); font-weight:400; }
+
+  .center-knobs {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 3%;
+    gap: 1%;
+  }
+  .center-knobs .knob-unit { gap: 13px; flex: 1; }
+  .center-knobs .knob-unit:nth-child(2) { flex: 1.5; }
+  .center-knobs .knob .ticks { display: none; }
+
+  .cbtn {
+    width: var(--cb); height: var(--cb);
+    border-radius: 50%;
+    position: relative;
+    flex: 0 0 auto;
+    background:
+      radial-gradient(circle at 50% 36%, #ffffff 0%, #f0f0ee 22%, #cfcfcd 48%, #bdbdbb 60%, #eeeeec 74%, #b2b2b0 100%);
+    box-shadow:
+      0 1px 2px rgba(255,255,255,0.9) inset,
+      0 -2px 5px rgba(0,0,0,0.20) inset,
+      0 5px 11px rgba(0,0,0,0.22),
+      0 2px 4px rgba(0,0,0,0.15);
+  }
+  .cbtn::after {
+    content:"";
+    position:absolute; inset:18%;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 50% 34%, #ffffff 0%, #e8e8e6 30%, #c4c4c2 68%, #d4d4d2 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.20) inset, 0 -1px 2px rgba(255,255,255,0.85) inset;
+  }
+  .cled {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: #b9b9b7;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.25) inset;
+  }
+  .cled.on {
+    background: radial-gradient(circle at 40% 35%, #ffd0a0, #ff6a1c 55%, #d23f00 100%);
+    box-shadow:
+      0 0 10px 2px rgba(255,90,20,0.75),
+      0 0 3px rgba(255,120,40,0.9),
+      0 1px 1px rgba(255,255,255,0.4) inset;
+  }
+
+  .preset-knob-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2cqw;
+    width: 100%;
+  }
+  .preset-knob-wrap .arrow {
+    color: #b8b8b6;
+    font-size: clamp(16px, 2.8vw, 30px);
+    font-weight: 300;
+    flex: 0 0 auto;
+  }
+  .preset-knob-wrap .knob { width: var(--bk); height: var(--bk); flex: 0 0 auto; }
+
+  .center-knobs .label.big {
+    font-size: clamp(10px, 1.7vw, 18px);
+  }
+
+  /* ============ FOOTSWITCH ROW ============ */
+  .foot-row {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    align-items: center;
+    position: relative;
+    padding: 2.2cqw 2.6cqw;
+    background: linear-gradient(180deg, #fbfbfa 0%, #f1f1ef 100%);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 1px rgba(255,255,255,0.9) inset,
+      0 -1px 3px rgba(0,0,0,0.06) inset,
+      0 6px 14px rgba(0,0,0,0.10);
+  }
+  .fs-tile {
+    width: var(--fst);
+    margin: 0 auto;
+    padding: 1.5cqw 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+  }
+  .fs-tile .switch-unit { gap: 1cqw; width: 100%; }
+
+  .switch-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 2;
+  }
+  .led {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #b9b9b7;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.25) inset;
+  }
+  .led.on {
+    background: radial-gradient(circle at 40% 35%, #ffd0a0, #ff6a1c 55%, #d23f00 100%);
+    box-shadow:
+      0 0 10px 2px rgba(255,90,20,0.75),
+      0 0 3px rgba(255,120,40,0.9),
+      0 1px 1px rgba(255,255,255,0.4) inset;
+  }
+
+  .footswitch {
+    width: var(--fb);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 36%, rgba(255,255,255,0.95), rgba(255,255,255,0) 46%),
+      conic-gradient(from 0deg,
+        #cfcfcd, #f3f3f1 11%, #c2c2c0 24%, #efefed 37%,
+        #bdbdbb 50%, #efefed 63%, #c2c2c0 76%, #f3f3f1 89%, #cfcfcd),
+      radial-gradient(circle at 50% 50%, #dcdcda, #a6a6a4 100%);
+    box-shadow:
+      0 1px 2px rgba(255,255,255,0.85) inset,
+      0 -2px 5px rgba(0,0,0,0.28) inset,
+      0 5px 11px rgba(0,0,0,0.22),
+      0 2px 4px rgba(0,0,0,0.15);
+    position: relative;
+  }
+  .footswitch::after {
+    content:"";
+    position:absolute; inset:20%;
+    border-radius:50%;
+    background:
+      conic-gradient(from 90deg,
+        #e4e4e2, #fafaf8 25%, #cacac8 50%, #fafaf8 75%, #e4e4e2),
+      radial-gradient(circle at 50% 35%, #fbfbfb, #c8c8c6 75%, #b4b4b2 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.22) inset, 0 -1px 2px rgba(255,255,255,0.8) inset;
+  }
+
+  .sw-label {
+    font-size: clamp(9px, 1.55vw, 16px);
+    color: #6f6f6d;
+    text-align: center;
+  }
+
+  .connector {
+    position: absolute;
+    top: 44%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #8a8a88;
+    font-size: clamp(8px, 1.4vw, 15px);
+    white-space: nowrap;
+    justify-content: center;
+    z-index: 1;
+  }
+  .connector .ln { width: clamp(8px,1.4vw,16px); height:1px; background:#c2c2c0; }
+  .connector .arr { color:#9a9a98; font-size: 1.05em; }
+  .conn1 { left: 25%; transform: translateX(-50%); }
+  .conn2 { left: 50%; transform: translateX(-50%); }
+  .conn3 { left: 75%; transform: translateX(-50%); }
+
+  .brand {
+    position: absolute;
+    right: 4%;
+    bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #8a8a88;
+    font-size: clamp(10px,1.5vw,15px);
+    font-weight: 500;
+  }
+  .brand .box {
+    border: 1px solid #9a9a98;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.85em;
+  }
+
+  /* ===== Blog generator app ===== */
+  .ov { position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center; padding:24px; }
+  .ov.open { display:flex; }
+  .ov-bd { position:absolute; inset:0; background:rgba(6,8,16,0.72); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+  @keyframes pop { from{opacity:0; transform:translateY(10px) scale(.98)} to{opacity:1; transform:none} }
+
+  .cardhost .card { background:rgba(14,19,38,.92); }
+
+  .blogwrap { position:relative; width:min(94vw,860px); max-height:90vh; background:#f4f5f7; border-radius:18px; overflow:hidden;
+              display:flex; flex-direction:column; box-shadow:0 30px 90px rgba(0,0,0,.6); animation:pop .3s ease; }
+  .blog-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:#fff; border-bottom:1px solid #e6e7ea; }
+  .blog-head h2 { font-size:18px; font-weight:600; color:#1d2330; }
+  .blog-body { overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:18px; }
+  .blogcard { border:1px solid #e3e5e9; border-radius:14px; overflow:hidden; background:#fff; }
+  .blogcard .bc-top { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid #eef0f3; }
+  .bc-title { font-size:15px; font-weight:600; color:#222; border:none; outline:none; width:60%; }
+  .badge { font-size:12px; padding:4px 10px; border-radius:999px; font-weight:600; }
+  .b-none{ background:#eef0f3; color:#5d6470; } .b-draft{ background:#fff3d6; color:#9a6a00; }
+  .b-sched{ background:#e0ecff; color:#1e5fd0; } .b-pub{ background:#d8f5e2; color:#137a44; }
+  .editor { padding:14px 16px; min-height:140px; max-height:320px; overflow:auto; font-size:14px; line-height:1.6; color:#2a2f3a; outline:none; }
+  .editor h2,.editor h3{ margin:12px 0 6px; color:#1a1f29; } .editor p{ margin:8px 0; }
+  .bc-actions { display:flex; flex-wrap:wrap; gap:8px; padding:12px 14px; border-top:1px solid #eef0f3; background:#fafbfc; }
+  .abtn { border:1px solid #d7dae0; background:#fff; color:#384150; border-radius:9px; padding:7px 12px; font:inherit; font-size:13px; cursor:pointer; display:inline-flex; gap:6px; align-items:center; }
+  .abtn:hover{ background:#f1f3f6; }
+  .abtn.pub{ background:#137a44; border-color:#137a44; color:#fff; } .abtn.pub:hover{ filter:brightness(1.08); }
+  .abtn.sch{ background:#1e5fd0; border-color:#1e5fd0; color:#fff; } .abtn.sch:hover{ filter:brightness(1.08); }
+  .schbox { display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%; margin-top:6px; }
+  .schbox input{ border:1px solid #d7dae0; border-radius:8px; padding:6px 8px; font:inherit; font-size:13px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#1d2330; color:#fff; padding:10px 16px; border-radius:10px; font-size:13px; z-index:2000; opacity:0; transition:.25s; }
+  .toast.show{ opacity:1; }
+
+  .ov .wiz-x { position:absolute; top:18px; right:22px; z-index:6; width:38px; height:38px; border-radius:50%;
+    border:1px solid rgba(255,255,255,.25); background:rgba(10,14,28,.85); color:#fff; font-size:19px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .ov .wiz-x:hover { background:rgba(30,38,60,.9); }
+  .portal-wrap { position:relative; animation:pop .3s cubic-bezier(.2,.8,.2,1); }
+  .portal {
+    position:relative; width:min(86vmin,600px); height:min(86vmin,600px); border-radius:50%;
+    overflow:hidden; background:#070b18 center/cover no-repeat;
+    box-shadow:0 0 0 1px rgba(120,160,255,.28), 0 0 70px rgba(70,120,255,.4),
+               inset 0 0 90px rgba(5,8,20,.92), 0 30px 90px rgba(0,0,0,.7);
+  }
+  .portal::after{ content:""; position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(circle at 50% 50%, rgba(10,15,35,.05) 28%, rgba(6,9,20,.78) 74%); }
+  .portal.hidden { display:none; }
+  .pring { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border-radius:50%;
+    border:1px solid rgba(140,175,255,.14); pointer-events:none; }
+  .pring.r1{ width:30%; height:30%; } .pring.r2{ width:52%; height:52%; }
+  .pring.r3{ width:74%; height:74%; } .pring.r4{ width:94%; height:94%; }
+  .portal-core { position:absolute; left:50%; top:50%; width:30px; height:30px; transform:translate(-50%,-50%);
+    border-radius:50%; background:radial-gradient(circle,#eaf2ff,#6ea2ff 58%,rgba(60,110,255,0));
+    box-shadow:0 0 34px 9px rgba(110,160,255,.7); animation:corepulse 3s ease-in-out infinite; pointer-events:none; }
+  @keyframes corepulse{ 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.85} 50%{transform:translate(-50%,-50%) scale(1.28);opacity:1} }
+  .pstar { position:absolute; transform:translate(-50%,-50%); background:none; border:none; cursor:pointer; z-index:4;
+    display:flex; flex-direction:column; align-items:center; gap:9px; color:#e3ebff; }
+  .pstar-dot { width:30px; height:30px; border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #eaf2ff, #79a8ff 46%, #2b5aa6 100%);
+    box-shadow:0 0 28px 10px rgba(98,148,236,.85), 0 0 56px 20px rgba(61,147,255,.45);
+    animation:twinkle 2.2s ease-in-out infinite; }
+  .pstar.big .pstar-dot{ width:44px; height:44px;
+    background:radial-gradient(circle at 40% 35%, #eaf2ff, #6294ec 46%, #21478e 100%);
+    box-shadow:0 0 40px 15px rgba(98,148,236,.95), 0 0 80px 28px rgba(61,147,255,.55); }
+  @keyframes twinkle{ 0%,100%{transform:scale(1);opacity:.92} 50%{transform:scale(1.16);opacity:1} }
+  .pstar:hover .pstar-dot{ transform:scale(1.28); box-shadow:0 0 50px 20px rgba(120,175,255,1), 0 0 90px 34px rgba(61,147,255,.6); }
+  .pstar-label { font-size:14.5px; letter-spacing:.4px; background:rgba(8,12,26,.62); padding:5px 14px;
+    border-radius:999px; border:1px solid rgba(120,165,255,.4); white-space:nowrap; }
+  .pstar.done .pstar-dot{ background:radial-gradient(circle at 40% 35%,#eaf2ff,#4f86d6 60%,#1a3f86 100%); box-shadow:0 0 30px 12px rgba(98,148,236,.85), 0 0 60px 22px rgba(61,147,255,.5); }
+  .pstar.done .pstar-label::after{ content:" ✓"; color:#9cc2ff; }
+  .portal-hint { position:absolute; left:0; right:0; top:13%; text-align:center;
+    color:#aebbe0; font-size:13px; letter-spacing:1.5px; animation:hintpulse 2.4s ease-in-out infinite; pointer-events:none; }
+  @keyframes hintpulse{ 0%,100%{opacity:.5} 50%{opacity:1} }
+  .portal-save { position:absolute; left:50%; bottom:9%; transform:translateX(-50%); z-index:5;
+    border:1px solid rgba(140,175,255,.35); background:rgba(20,28,52,.7); color:#dce6ff;
+    padding:9px 18px; border-radius:999px; font:inherit; font-size:13.5px; cursor:pointer; }
+  .portal-save:hover{ background:rgba(40,55,95,.8); }
+  .cardhost { display:none; width:min(92vw,560px); }
+  .cardhost.open { display:block; width:min(94vw,860px); max-height:88vh; overflow:auto; animation:pop .25s ease; }
+  .cardhost .card { padding:28px 30px; border-radius:20px; }
+  .cardhost .card h3 { font-size:25px; }
+  .cardhost .card .sub, .cardhost .sub { font-size:15.5px; margin-bottom:20px; }
+  .cardhost .cardtop { gap:16px; margin-bottom:8px; }
+  .cardhost .field { gap:12px; margin-bottom:18px; }
+  .cardhost .field input { padding:14px 16px; font-size:16px; border-radius:12px; }
+  .cardhost .btn { padding:13px 22px; font-size:15.5px; border-radius:12px; }
+  .cardhost .btn-sm { padding:9px 16px; font-size:14px; }
+  .cardhost .chips { gap:11px; }
+  .cardhost .chip { padding:12px 18px; font-size:15px; }
+  .cardhost .muted { font-size:14px; }
+  .cardhost .wiz-foot { margin-top:22px; }
+  .cardtop { display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+  .cardtop h3 { margin:0; }
+
+  .card { position:relative; z-index:2; background:rgba(18,24,44,.92); border:1px solid rgba(130,160,255,.18);
+          border-radius:16px; padding:18px; color:#e7ecfb; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  .card h3 { font-size:19px; font-weight:600; margin:0 0 4px; color:#eef2ff; }
+  .card .sub, .sub { font-size:13px; color:#9fb0d8; margin-bottom:14px; }
+  .cardtop { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+  .cardtop h3 { margin:0; }
+  .field { display:flex; gap:8px; margin-bottom:12px; }
+  .field input { flex:1; background:rgba(8,12,26,.85); border:1px solid rgba(130,160,255,.25); color:#eef2ff;
+                 padding:10px 12px; border-radius:10px; font:inherit; font-size:14px; outline:none; }
+  .field input:focus { border-color:#6ea2ff; }
+  .btn { border:none; border-radius:10px; padding:10px 16px; font:inherit; font-size:14px; font-weight:500; cursor:pointer; transition:.15s; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn-pri { background:linear-gradient(180deg,#6ea2ff,#3b73ff); color:#fff; }
+  .btn-pri:hover:not(:disabled){ filter:brightness(1.08); }
+  .btn-gho { background:rgba(255,255,255,.08); color:#cfd8f5; border:1px solid rgba(255,255,255,.16); }
+  .btn-sm { padding:7px 12px; font-size:13px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 4px; }
+  .chip { padding:8px 13px; border-radius:999px; background:rgba(40,52,86,.7); border:1px solid rgba(130,160,255,.2);
+          color:#cdd7f5; font-size:13px; cursor:pointer; transition:.15s; user-select:none; }
+  .chip:hover { border-color:#6ea2ff; }
+  .chip.sel { background:linear-gradient(180deg,#6ea2ff,#3b73ff); color:#fff; border-color:transparent; }
+  .muted { color:#8ea0cc; font-size:12.5px; }
+  .wiz-foot { display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+  .spin { width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%;
+          display:inline-block; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:6px; }
+  @keyframes sp { to{ transform:rotate(360deg) } }
+
+  /* product picker additions */
+  .prod-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .prod-card { border:1px solid rgba(130,160,255,.25); border-radius:8px; padding:8px; background:rgba(18,24,44,.75); width:120px; cursor:pointer; text-align:center; }
+  .prod-card.sel { border-color:#6ea2ff; background:rgba(40,55,95,.9); }
+  .prod-card img { width:100%; height:80px; object-fit:cover; border-radius:4px; margin-bottom:4px; }
+  .prod-name { font-size:12px; color:#cdd7f5; margin-bottom:2px; }
+  .prod-price { font-size:11px; color:#8ea0cc; }
+  .search-input { margin:8px 0; }
+
+  /* new product search box */
+  .product-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(8,12,26,.85);
+    border: 1px solid rgba(130,160,255,.25);
+    border-radius: 12px;
+    padding: 0 12px;
+    transition: border-color .2s;
+  }
+  .product-search-box:focus-within {
+    border-color: #6ea2ff;
+  }
+  .product-search-box input {
+    flex:1;
+    background: transparent;
+    border: none;
+    color: #eef2ff;
+    font-size: 14px;
+    padding: 10px 8px;
+    outline: none;
+  }
+  .product-search-box .search-icon {
+    color: #6ea2ff;
+    font-size: 16px;
+    margin-right: 4px;
+  }
+  .product-search-box .loading-spinner {
+    margin-left: 8px;
+  }
+    .keyword-chip {
+  background: rgba(40,52,86,.7);
+  border: 1px solid rgba(130,160,255,.2);
+  color: #cdd7f5;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+  .foot-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;  /* centering */
+  gap: 2cqw;
+  padding: 2.2cqw 2.6cqw;
+  background: linear-gradient(180deg, #fbfbfa 0%, #f1f1ef 100%);
+  border-radius: 18px;
   box-shadow:
-    0 1px 0 rgba(255,255,255,.06) inset,
-    0 0 0 1px var(--chassis-edge),
-    0 0 0 2.5px rgba(0,0,0,.7),
-    0 60px 110px -40px rgba(0,0,0,.9),
-    0 24px 44px -24px rgba(0,0,0,.65);
-}
-.db-chassis::before{
-  content:""; position:absolute; inset:0; border-radius:28px; pointer-events:none;
-  background-image:
-    radial-gradient(rgba(255,255,255,.035) .5px,transparent .6px),
-    radial-gradient(rgba(0,0,0,.2) .5px,transparent .6px);
-  background-size:4px 4px,7px 7px; background-position:0 0,3px 2px;
-  mix-blend-mode:overlay;
-}
-.db-brand{
-  position:absolute; right:22px; bottom:12px;
-  font-size:12px; color:#2d3848; letter-spacing:.05em;
-  font-family:'Space Mono',monospace;
-}
-
-/* ── TOP BAR ── */
-.db-topbar{
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:16px; padding:0 2px;
-  gap:12px;
-}
-.db-topbar-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.db-topbar-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--led-on);box-shadow:0 0 8px 2px rgba(255,90,38,.8)}
-.db-topbar-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.07em;color:var(--ink-mid)}
-.db-top-btns{display:flex;gap:8px}
-.db-topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-
-/* ── METALLIC BUTTON BASE ── */
-.db-mbtn{
-  position:relative; display:flex; align-items:center; gap:7px;
-  padding:9px 18px; border-radius:10px; border:none; cursor:pointer;
-  font-family:'Space Mono',monospace; font-size:11px; font-weight:700;
-  letter-spacing:.07em; user-select:none; overflow:hidden;
-  transition:transform .1s,box-shadow .12s;
-  white-space:nowrap;
-}
-.db-mbtn:active{transform:translateY(1px) scale(.98)}
-.db-mbtn-pip{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .2s,box-shadow .2s}
-
-/* light chrome */
-.db-mbtn.chrome{
-  background:
-    radial-gradient(circle at 50% 24%,rgba(255,255,255,.9),rgba(255,255,255,0) 50%),
-    conic-gradient(from 0deg,#c5c9ce,#f0f2f4,#b8bcc2,#e8eaed,#bec2c8,#f2f4f6,#bcbfc5,#e6e9ec,#c5c9ce);
-  color:#22262c;
-  box-shadow:
-    0 2px 1px rgba(255,255,255,.88) inset,
-    0 -4px 9px rgba(0,0,0,.22) inset,
-    0 0 0 1px #96999f,
-    0 10px 18px -9px rgba(0,0,0,.55),
-    0 3px 7px -3px rgba(0,0,0,.22);
-}
-.db-mbtn.chrome .db-mbtn-pip{background:#aaaaaa;box-shadow:0 0 0 1px #888 inset}
-.db-mbtn.chrome.lit .db-mbtn-pip{background:var(--led-on);box-shadow:0 0 0 1px #c43d10 inset,0 0 7px 1px rgba(255,90,38,.9)}
-.db-mbtn.chrome:hover{box-shadow:0 2px 1px rgba(255,255,255,.88) inset,0 -4px 9px rgba(0,0,0,.22) inset,0 0 0 1px #adb0b6,0 12px 20px -9px rgba(0,0,0,.45),0 0 16px rgba(180,200,255,.1)}
-
-/* dark slate */
-.db-mbtn.slate{
-  background:
-    radial-gradient(circle at 50% 28%,rgba(255,255,255,.13),rgba(255,255,255,0) 48%),
-    conic-gradient(from 0deg,#1c2031,#383d52,#161927,#333848,#121520,#35394e,#191c2c,#34384c,#1c2031);
-  color:var(--ink-bright);
-  box-shadow:
-    0 2px 2px rgba(255,255,255,.08) inset,
-    0 -6px 11px rgba(0,0,0,.58) inset,
-    0 0 0 1px #09091328,
-    0 0 0 1px rgba(255,255,255,.03),
-    0 13px 22px -10px rgba(0,0,0,.72),
-    0 3px 7px -3px rgba(0,0,0,.4);
-}
-.db-mbtn.slate .db-mbtn-pip{background:#1e2435;box-shadow:0 0 0 1px #0d1020 inset}
-.db-mbtn.slate.lit .db-mbtn-pip{background:var(--led-on);box-shadow:0 0 0 1px #c43d10 inset,0 0 9px 1px rgba(255,90,38,.9)}
-.db-mbtn.slate:hover{box-shadow:0 2px 2px rgba(255,255,255,.08) inset,0 -6px 11px rgba(0,0,0,.58) inset,0 0 0 1px #1c2238,0 13px 22px -10px rgba(0,0,0,.6),0 0 22px rgba(90,130,255,.13)}
-
-/* big generate right */
-.db-mbtn.big-gen{
-  padding:10px 26px; border-radius:12px; font-size:12px;
-  background:
-    radial-gradient(circle at 50% 26%,rgba(255,255,255,.13),rgba(255,255,255,0) 46%),
-    conic-gradient(from 0deg,#1c2040,#383d58,#181c36,#333852,#141830,#363c54,#1a1e38,#333a50,#1c2040);
-  box-shadow:
-    0 2px 2px rgba(255,255,255,.09) inset,
-    0 -7px 14px rgba(0,0,0,.6) inset,
-    0 0 0 1px #080a14,
-    0 0 0 2px rgba(255,255,255,.04),
-    0 18px 32px -12px rgba(0,0,0,.75);
-}
-.db-mbtn.big-gen.lit{box-shadow:0 2px 2px rgba(255,255,255,.09) inset,0 -7px 14px rgba(0,0,0,.6) inset,0 0 0 1px #0e1020,0 0 0 3px rgba(100,140,255,.3),0 18px 32px -12px rgba(0,0,0,.6),0 0 36px rgba(80,120,255,.18)}
-.db-mbtn::after{
-  content:""; position:absolute; top:0; left:-80%; width:55%; height:100%;
-  background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.06) 50%,transparent 100%);
-  animation:shimmer 4s ease-in-out infinite; pointer-events:none;
-}
-@keyframes shimmer{0%{left:-80%}100%{left:120%}}
-
-/* ── LAYOUT ── */
-.db-layout{display:grid;grid-template-columns:56px 1fr 56px;gap:12px;align-items:start}
-.db-col-btns{display:flex;flex-direction:column;gap:10px;align-items:center;padding-top:8px}
-
-/* ── SIDE ICON BUTTONS ── */
-.db-side-btn{
-  width:42px; height:42px; border-radius:10px; border:none; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; font-size:16px;
-  background:linear-gradient(180deg,var(--panel-1),var(--panel-2));
-  box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 0 0 1px var(--panel-line),0 4px 10px -4px rgba(0,0,0,.5);
-  transition:all .15s; color:var(--ink-dim);
-}
-.db-side-btn:hover{color:var(--ink-mid);box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 0 0 1px #2e3650,0 4px 10px -4px rgba(0,0,0,.5),0 0 12px rgba(80,120,255,.1)}
-
-/* ── CENTER COLUMN ── */
-.db-center-col{display:flex;flex-direction:column;gap:12px}
-
-/* ── SCREEN ── */
-.db-screen{
-  position:relative; border-radius:16px; overflow:hidden;
-  background:radial-gradient(150% 140% at 50% -10%,var(--screen-1),var(--screen-2) 75%);
-  box-shadow:0 0 0 1px #000,0 0 0 2px #090b12,0 18px 36px -18px rgba(0,0,0,.85),0 2px 0 rgba(255,255,255,.04) inset;
-  padding:22px 22px 20px;
-  display:flex; flex-direction:column; gap:14px; min-height:180px;
-}
-.db-screen::before{
-  content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
-  background:repeating-linear-gradient(180deg,transparent 0,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px);
-}
-.db-screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.04),transparent 20%)}
-.db-screen-hdr{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
-.db-screen-logo{display:flex;gap:3px;align-items:flex-end;height:20px}
-.db-screen-logo i{width:3.5px;border-radius:2px;background:rgba(190,210,240,.5);display:block}
-.db-screen-logo i:nth-child(1){height:10px}
-.db-screen-logo i:nth-child(2){height:16px}
-.db-screen-logo i:nth-child(3){height:10px}
-.db-screen-name{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.18em;color:rgba(110,140,195,.55)}
-.db-screen-status{font-family:'Space Mono',monospace;font-size:9px;color:rgba(90,130,185,.4);letter-spacing:.1em}
-
-/* main nav tabs */
-.db-nav{display:flex;gap:8px;position:relative;z-index:2;flex-wrap:wrap}
-.db-nav-btn{
-  display:flex; align-items:center; gap:6px;
-  padding:7px 14px; border-radius:9px; border:none; cursor:pointer;
-  font-family:'Space Mono',monospace; font-size:10px; font-weight:700;
-  letter-spacing:.07em; transition:all .18s;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.05);
-  color:var(--ink-mid);
-}
-.db-nav-btn:hover{background:rgba(255,255,255,.07);color:var(--ink-bright);border-color:rgba(255,255,255,.09)}
-.db-nav-btn.active{
-  background:rgba(59,111,255,.15); border-color:rgba(59,111,255,.4);
-  color:#a0c0ff;
-  box-shadow:0 0 16px rgba(59,111,255,.18);
-}
-.db-nav-btn .nav-dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dim);flex-shrink:0;transition:background .18s,box-shadow .18s}
-.db-nav-btn.active .nav-dot{background:#4080ff;box-shadow:0 0 7px rgba(64,128,255,.9)}
-.db-nav-icon{font-size:13px}
-
-/* screen info strip */
-.db-screen-strip{
-  display:flex; gap:10px; position:relative; z-index:2; flex-wrap:wrap;
-}
-.db-strip-card{
-  flex:1; min-width:80px;
-  background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.04);
-  border-radius:9px; padding:9px 12px;
-}
-.db-strip-val{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;color:var(--ink-bright);letter-spacing:-.02em}
-.db-strip-lbl{font-size:10px;color:var(--ink-mid);margin-top:2px}
-.db-strip-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.05);margin-top:6px;overflow:hidden}
-.db-strip-fill{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--accent),var(--accent-2));box-shadow:0 0 5px rgba(100,140,255,.5)}
-
-/* ── SUB PANEL ── */
-.db-sub{
-  background:linear-gradient(180deg,var(--panel-1),var(--panel-2));
-  border-radius:16px;
-  box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 0 0 1px var(--panel-line),0 12px 26px -18px rgba(0,0,0,.6);
-  overflow:hidden;
-}
-.db-sub-inner{padding:18px 18px 20px;display:flex;flex-direction:column;gap:14px}
-
-/* sub tab bar */
-.db-sub-tabs{display:flex;gap:6px;flex-wrap:wrap}
-.db-sub-tab{
-  padding:6px 14px; border-radius:8px; border:none; cursor:pointer;
-  font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.06em;
-  transition:all .16s;
-  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.05); color:var(--ink-dim);
-}
-.db-sub-tab:hover{color:var(--ink-mid);border-color:rgba(255,255,255,.08)}
-.db-sub-tab.active{background:rgba(59,111,255,.16);border-color:rgba(59,111,255,.4);color:#8ab0ff}
-
-/* grid chips */
-.db-chip-grid{display:flex;flex-wrap:wrap;gap:8px}
-.db-chip{
-  padding:6px 14px; border-radius:20px; border:none; cursor:pointer;
-  font-size:12px; transition:all .16s;
-  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
-  color:var(--ink-mid); display:flex; align-items:center; gap:6px;
-}
-.db-chip:hover{border-color:rgba(255,255,255,.14);color:var(--ink-bright)}
-.db-chip.sel{background:rgba(59,111,255,.18);border-color:rgba(59,111,255,.5);color:#a0c4ff}
-.db-chip-badge{
-  font-family:'Space Mono',monospace; font-size:9px;
-  background:rgba(255,255,255,.07); border-radius:10px; padding:1px 6px;
-}
-.db-chip.sel .db-chip-badge{background:rgba(59,111,255,.3)}
-
-/* product table */
-.db-prod-table{display:flex;flex-direction:column;gap:6px}
-.db-prod-row{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:8px 12px; border-radius:9px; cursor:pointer; transition:all .15s;
-  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.04);
-}
-.db-prod-row:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.09)}
-.db-prod-row.sel{background:rgba(59,111,255,.14);border-color:rgba(59,111,255,.4)}
-.db-prod-name{font-size:12px;color:var(--ink-bright)}
-.db-prod-price{font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-mid)}
-
-/* competitor sub-tabs */
-.db-comp-tabs{display:flex;gap:7px;flex-wrap:wrap}
-.db-comp-tab{
-  padding:7px 15px; border-radius:9px; border:none; cursor:pointer;
-  font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.06em;
-  transition:all .16s;
-  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.05); color:var(--ink-dim);
-  display:flex; align-items:center; gap:6px;
-}
-.db-comp-tab:hover{color:var(--ink-mid);border-color:rgba(255,255,255,.09)}
-.db-comp-tab.active{background:rgba(139,92,246,.16);border-color:rgba(139,92,246,.45);color:#c4a0ff}
-.db-comp-tab .comp-dot{width:5px;height:5px;border-radius:50%;background:var(--ink-dim);flex-shrink:0;transition:all .16s}
-.db-comp-tab.active .comp-dot{background:#a070ff;box-shadow:0 0 6px rgba(160,112,255,.9)}
-
-/* competitor info card */
-.db-comp-info{
-  display:grid; grid-template-columns:1fr 1fr; gap:12px;
-}
-.db-comp-stat{
-  background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.04);
-  border-radius:10px; padding:10px 14px;
-}
-.db-comp-stat-val{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--ink-bright);letter-spacing:-.02em}
-.db-comp-stat-lbl{font-size:10px;color:var(--ink-mid);margin-top:2px;letter-spacing:.04em}
-.db-comp-domain{font-family:'Space Mono',monospace;font-size:10px;color:rgba(100,140,200,.55);margin-bottom:2px}
-.db-comp-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.05em;color:var(--ink-bright)}
-.db-comp-section-lbl{font-size:10px;color:var(--ink-dim);letter-spacing:.12em;font-family:'Space Mono',monospace;margin-bottom:6px}
-.db-weakness{
-  font-size:11px; color:rgba(255,140,100,.75);
-  background:rgba(255,90,38,.07); border:1px solid rgba(255,90,38,.12);
-  border-radius:6px; padding:4px 10px; display:inline-block; margin:2px;
-}
-.db-top-page{
-  font-size:11px; color:rgba(100,180,255,.75);
-  background:rgba(59,111,255,.07); border:1px solid rgba(59,111,255,.12);
-  border-radius:6px; padding:4px 10px; display:inline-block; margin:2px;
-  font-family:'Space Mono',monospace;
-}
-
-/* calendar */
-.db-cal{display:flex;flex-direction:column;gap:12px}
-.db-cal-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.db-cal-label{font-size:11px;color:var(--ink-mid);min-width:90px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.08em}
-.db-select{
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
-  border-radius:8px; padding:7px 12px; color:var(--ink-bright); font-size:12px;
-  cursor:pointer; font-family:'Hanken Grotesk',sans-serif; outline:none;
-  transition:border-color .15s;
-}
-.db-select:focus{border-color:rgba(59,111,255,.5)}
-.db-select option{background:#1e2433;color:var(--ink-bright)}
-.db-festival-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.db-festival-chip{
-  padding:5px 12px; border-radius:16px; font-size:11px; cursor:pointer;
-  border:1px solid rgba(255,255,255,.07); background:rgba(255,255,255,.04);
-  color:var(--ink-mid); transition:all .15s;
-}
-.db-festival-chip:hover{border-color:rgba(255,255,255,.14);color:var(--ink-bright)}
-.db-festival-chip.sel{background:rgba(139,92,246,.18);border-color:rgba(139,92,246,.45);color:#c4a0ff}
-.db-cal-auto{
-  padding:8px 14px; border-radius:9px; border:1px solid rgba(59,111,255,.25);
-  background:rgba(59,111,255,.08); color:#80aaff;
-  font-size:11px; display:flex; align-items:center; gap:8px; cursor:pointer;
-  font-family:'Space Mono',monospace; font-size:10px; letter-spacing:.05em;
-  transition:all .16s;
-}
-.db-cal-auto:hover{background:rgba(59,111,255,.14);border-color:rgba(59,111,255,.4)}
-.db-cal-auto input[type=checkbox]{accent-color:#4080ff;cursor:pointer}
-.db-cal-schedule{
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-}
-.db-cal-input{
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
-  border-radius:8px; padding:6px 12px; color:var(--ink-bright); font-size:12px;
-  outline:none; font-family:'Space Mono',monospace; width:160px; transition:border-color .15s;
-}
-.db-cal-input:focus{border-color:rgba(59,111,255,.4)}
-
-/* keywords */
-.db-kw-table{display:flex;flex-direction:column;gap:5px}
-.db-kw-row{
-  display:grid; grid-template-columns:1fr 70px 60px 90px;
-  gap:10px; align-items:center;
-  padding:8px 12px; border-radius:8px;
-  background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.04);
-  cursor:pointer; transition:all .15s;
-}
-.db-kw-row:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08)}
-.db-kw-row.sel{background:rgba(59,111,255,.12);border-color:rgba(59,111,255,.35)}
-.db-kw-hdr{
-  display:grid; grid-template-columns:1fr 70px 60px 90px;
-  gap:10px; padding:4px 12px;
-}
-.db-kw-hdr-cell{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--ink-dim)}
-.db-kw-text{font-size:12px;color:var(--ink-bright)}
-.db-kw-vol{font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-mid)}
-.db-kw-diff{font-family:'Space Mono',monospace;font-size:11px}
-.db-kw-intent{
-  font-size:9px; padding:2px 8px; border-radius:10px; font-family:'Space Mono',monospace;
-  letter-spacing:.04em; display:inline-block;
-}
-.intent-Commercial{background:rgba(59,111,255,.15);color:#80aaff;border:1px solid rgba(59,111,255,.25)}
-.intent-Transactional{background:rgba(80,200,100,.12);color:#80e090;border:1px solid rgba(80,200,100,.22)}
-.intent-Informational{background:rgba(250,180,50,.1);color:#e8c060;border:1px solid rgba(250,180,50,.18)}
-
-/* search console */
-.db-sc-tabs{display:flex;gap:6px}
-.db-sc-tab{
-  padding:6px 14px; border-radius:8px; border:none; cursor:pointer;
-  font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:.06em;
-  transition:all .16s; background:rgba(255,255,255,.03);
-  border:1px solid rgba(255,255,255,.05); color:var(--ink-dim);
-}
-.db-sc-tab.active{background:rgba(59,111,255,.16);border-color:rgba(59,111,255,.4);color:#8ab0ff}
-.db-sc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.db-sc-card{
-  background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.04);
-  border-radius:10px; padding:12px 14px;
-}
-.db-sc-val{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--ink-bright);letter-spacing:-.02em}
-.db-sc-lbl{font-size:10px;color:var(--ink-mid);margin-top:3px;letter-spacing:.04em}
-.db-sc-change{font-size:10px;margin-top:4px}
-.db-sc-up{color:#60d480}.db-sc-down{color:#ff6060}
-.db-sc-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.05);margin-top:8px;overflow:hidden}
-.db-sc-fill{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
-
-.db-sc-table{display:flex;flex-direction:column;gap:5px}
-.db-sc-row{
-  display:grid; grid-template-columns:1fr 80px 60px 70px;
-  gap:8px; align-items:center;
-  padding:7px 12px; border-radius:8px;
-  background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.04);
-}
-.db-sc-row-lbl{font-size:11px;color:var(--ink-bright)}
-.db-sc-row-val{font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-mid);text-align:right}
-
-/* modal overlay */
-.db-modal-overlay{
-  position:fixed; inset:0; z-index:100;
-  background:rgba(5,7,14,.82); backdrop-filter:blur(6px);
-  display:flex; align-items:center; justify-content:center; padding:20px;
-}
-.db-modal{
-  background:linear-gradient(175deg,var(--chassis-1),var(--chassis-2));
-  border-radius:20px; padding:28px;
-  box-shadow:0 0 0 1px var(--chassis-edge),0 40px 80px -24px rgba(0,0,0,.9);
-  max-width:560px; width:100%; max-height:80vh; overflow-y:auto;
-  position:relative;
-}
-.db-modal-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.06em;color:var(--ink-bright);margin-bottom:6px}
-.db-modal-sub{font-size:12px;color:var(--ink-mid);margin-bottom:18px}
-.db-modal-close{
-  position:absolute; top:18px; right:18px;
-  width:28px; height:28px; border-radius:8px; border:none; cursor:pointer;
-  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
-  color:var(--ink-mid); font-size:14px; display:flex; align-items:center; justify-content:center;
-  transition:all .15s;
-}
-.db-modal-close:hover{background:rgba(255,255,255,.1);color:var(--ink-bright)}
-.db-modal-section{margin-bottom:16px}
-.db-modal-section-title{font-size:10px;color:var(--ink-dim);letter-spacing:.14em;font-family:'Space Mono',monospace;margin-bottom:8px}
-.db-topic-chip{
-  padding:7px 14px; border-radius:20px; border:1px solid rgba(255,255,255,.07);
-  background:rgba(255,255,255,.04); color:var(--ink-mid); font-size:12px;
-  cursor:pointer; transition:all .15s; display:inline-block; margin:3px;
-}
-.db-topic-chip:hover{border-color:rgba(255,255,255,.15);color:var(--ink-bright)}
-.db-topic-chip.sel{background:rgba(59,111,255,.18);border-color:rgba(59,111,255,.5);color:#a0c4ff}
-
-/* big gen btn */
-.db-big-gen{
-  width:100%; padding:18px 28px; border-radius:14px; border:none; cursor:pointer;
-  font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:.12em; color:#fff;
-  position:relative; overflow:hidden;
-  background:
-    radial-gradient(circle at 50% 26%,rgba(255,255,255,.13),rgba(255,255,255,0) 46%),
-    conic-gradient(from 0deg,#1c2040,#383d58,#181c36,#343a52,#141830,#363c54,#1a1e38,#343a50,#1c2040);
-  box-shadow:
-    0 2px 2px rgba(255,255,255,.09) inset,
-    0 -7px 14px rgba(0,0,0,.6) inset,
-    0 0 0 1px #080a14,
-    0 0 0 2px rgba(255,255,255,.04),
-    0 18px 30px -12px rgba(0,0,0,.8);
-  display:flex; align-items:center; justify-content:center; gap:12px;
-  transition:transform .1s, box-shadow .16s;
-}
-.db-big-gen:hover{box-shadow:0 2px 2px rgba(255,255,255,.09) inset,0 -7px 14px rgba(0,0,0,.6) inset,0 0 0 1px #0e1022,0 0 0 3px rgba(100,140,255,.28),0 18px 30px -12px rgba(0,0,0,.65),0 0 38px rgba(80,120,255,.18)}
-.db-big-gen:active{transform:translateY(2px) scale(.99)}
-.db-big-gen::after{content:"";position:absolute;top:0;left:-80%;width:55%;height:100%;background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.06) 50%,transparent 100%);animation:shimmer 4s ease-in-out infinite;pointer-events:none}
-.db-big-gen-led{width:12px;height:12px;border-radius:50%;background:var(--led-off);box-shadow:0 0 0 1px #060810 inset;transition:all .3s;flex-shrink:0}
-.db-big-gen.active .db-big-gen-led{background:var(--led-on);box-shadow:0 0 0 1px #c43d10 inset,0 0 11px 3px rgba(255,90,38,.9)}
-.db-gen-arrow{font-size:20px;color:rgba(200,215,255,.65);transition:transform .2s}
-.db-big-gen:hover .db-gen-arrow{transform:translateX(5px)}
-
-/* section empty state */
-.db-empty{
-  text-align:center; padding:32px 20px;
-  color:var(--ink-dim); font-size:12px; font-family:'Space Mono',monospace;
-  letter-spacing:.08em;
-}
-
-@media(max-width:720px){
-  .db-layout{grid-template-columns:1fr}
-  .db-col-btns{flex-direction:row;flex-wrap:wrap}
-  .db-sc-grid{grid-template-columns:1fr 1fr}
-  .db-comp-info{grid-template-columns:1fr}
+    0 1px 1px rgba(255,255,255,0.9) inset,
+    0 -1px 3px rgba(0,0,0,0.06) inset,
+    0 6px 14px rgba(0,0,0,0.10);
+  position: relative;
 }
 `;
 
-/* ═══════════════════════════════════════════════════════════
-   METALLIC BUTTON
-═══════════════════════════════════════════════════════════ */
-function MBtn({
-  label, variant = "slate", lit, onClick, icon, size,
-}: {
-  label: string; variant?: "chrome" | "slate" | "big-gen";
-  lit?: boolean; onClick?: () => void; icon?: string; size?: "big";
-}) {
-  return (
-    <button
-      type="button"
-      className={`db-mbtn ${variant}${lit ? " lit" : ""}${size === "big" ? " big" : ""}`}
-      onClick={onClick}
-    >
-      <div className="db-mbtn-pip" />
-      {icon && <span style={{ fontSize: 13 }}>{icon}</span>}
-      {label}
-    </button>
-  );
+// ============================================================================
+// Constants
+// ============================================================================
+
+// Bottom knob-row labels updated: feedback->store, left->competitor, preset/pages->calendar, right->keywords
+const KNOBS: Array<{ id: string; label: string }> = [
+  { id: "kFeedback", label: "store" },
+  { id: "kLeft", label: "competitor" },
+  { id: "kPreset", label: "calendar" },
+  { id: "kRight", label: "keywords" },
+];
+
+// Maps each bottom knob id to the info-modal it should open (null = no modal, keep old behavior)
+const KNOB_MODAL_MAP: Record<string, KnobModalType> = {
+  kFeedback: "store",
+  kLeft: "competitor",
+  kPreset: "calendar",
+  kRight: "keywords",
+  kMod: null,
+};
+
+
+// Local storage key used to persist the topic -> product selection so the
+// "Product" step and the "Generator" step can be done in separate visits.
+const LS_KEY = "meris_lvx_topic_products_v1";
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const uid = (): string => Math.random().toString(36).slice(2, 9);
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+interface VUProps {
+  side: "left" | "right";
 }
 
-/* ═══════════════════════════════════════════════════════════
-   KNOB
-═══════════════════════════════════════════════════════════ */
-function Knob({ size = "md", label, defaultVal = 0 }: { size?: "sm" | "md"; label: string; defaultVal?: number }) {
-  const knobRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
-  const drag = useRef({ active: false, startY: 0, startVal: 0 });
-  const [val, setVal] = useState(defaultVal);
-
-  useEffect(() => {
-    const k = knobRef.current, ring = ringRef.current;
-    if (!k || !ring) return;
-    ring.innerHTML = "";
-    const N = size === "sm" ? 18 : 24;
-    const r = k.offsetWidth / 2 + 8;
-    for (let i = 0; i < N; i++) {
-      const a = ((-150 + (300 / (N - 1)) * i) * Math.PI) / 180;
-      const d = document.createElement("i");
-      d.style.cssText = `position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px;border-radius:50%;background:#2a3044;transform-origin:center;transform:translate(${Math.sin(a) * r}px,${-Math.cos(a) * r}px)`;
-      ring.appendChild(d);
+const VU: FC<VUProps> = ({ side }) => {
+  const rows = 9;
+  const cols = 4;
+  const heights = side === "left" ? [6, 4, 7, 3] : [5, 8, 4, 6];
+  const dots: React.ReactNode[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const lit = rows - r <= heights[c];
+      dots.push(<span key={`${r}-${c}`} className={"dot" + (lit ? "" : " off")} />);
     }
-  }, [size]);
+  }
+  return (
+    <div className="vu" style={{ gridTemplateRows: `repeat(${rows},1fr)` }}>
+      {dots}
+    </div>
+  );
+};
 
+// ============================================================================
+// Main component
+// ============================================================================
+
+const MerisLVX: FC = () => {
+  // --- Panel / knob UI state ---
+  const [selected, setSelected] = useState<string>("kFeedback");
+  const [ox, setOx] = useState<string>("10%");
+  const footRef = useRef<HTMLDivElement>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  // --- Store data ---
+  const [storeData, setStoreData] = useState<StoreData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // --- Topic wizard state ---
+  const [wizOpen, setWizOpen] = useState<boolean>(false);
+  const [activeStar, setActiveStar] = useState<StarKey>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [selTopics, setSelTopics] = useState<Set<string>>(() => new Set());
+  const [custom, setCustom] = useState<string>("");
+
+  const [footDetail, setFootDetail] = useState<{
+    type: "competitor" | "keyword";
+    data: any; // competitor object or keyword array
+  } | null>(null);
+  const footDetailRef = useRef<HTMLDivElement>(null);
+const [knobModal, setKnobModal] = useState<{
+  type: "store" | "competitor" | "calendar" | "keywords";
+  data?: any;
+} | null>(null);
+  // --- Products & topic-product mapping ---
+  const [productsCache, setProductsCache] = useState<Record<string, Product>>({});
+  const [productsSearchResults, setProductsSearchResults] = useState<Product[]>([]);
+  const [showProductConfig, setShowProductConfig] = useState<boolean>(false);
+  const [productSearch, setProductSearch] = useState<string>("");
+  const [activeTopicForProduct, setActiveTopicForProduct] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [topicProductsMap, setTopicProductsMap] = useState<Record<string, string[]>>({});
+
+    const [collectionOpen, setCollectionOpen] = useState(false);
+const [productOpen, setProductOpen] = useState(false);
+const [competitorModal, setCompetitorModal] = useState<StoreData["competitors"][number] | null>(null);
+const [campaignCompetitorUrl, setCampaignCompetitorUrl] = useState("");
+
+const [seasonalOpen, setSeasonalOpen] = useState(false);
+const [culturalOpen, setCulturalOpen] = useState(false);
+const [retailOpen, setRetailOpen] = useState(false);
+const [experientialOpen, setExperientialOpen] = useState(false);
+const [shortTailOpen, setShortTailOpen] = useState(false);
+const [longTailOpen, setLongTailOpen] = useState(false);
+  // --- Generated blogs ---
+  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [blogOpen, setBlogOpen] = useState<boolean>(false);
+  const [generating, setGenerating] = useState<boolean>(false);
+const [campaignCollections, setCampaignCollections] = useState<string[]>([]);
+const [campaignProducts, setCampaignProducts] = useState<string[]>([]);
+const [campaignKeywords, setCampaignKeywords] = useState<string[]>([]);
+  // --- Toast ---
+  const [toastMsg, setToastMsg] = useState<string>("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [campaignCalendar, setCampaignCalendar] = useState<{
+  type: string;
+  name: string;
+  country?: string;
+  date?: string;
+}>({ type: "", name: "" });
+
+  const toast = useCallback((message: string): void => {
+    setToastMsg(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(""), 2200);
+  }, []);
+
+  // Load store analysis from the backend on mount.
   useEffect(() => {
-    const move = (y: number) => {
-      if (!drag.current.active) return;
-      const next = Math.max(-150, Math.min(150, drag.current.startVal + (drag.current.startY - y) * 1.4));
-      setVal(next);
+    const fetchData = async (): Promise<void> => {
+      try {
+        const response = await ApiService.post(ApiConfig.analyzeStore);
+        setStoreData(response);
+        if (response?.blogTopics) {
+          const loadedTopics: Topic[] = response.blogTopics.map((bt: StoreData["blogTopics"][number]) => ({
+            id: uid(),
+            name: bt.title,
+            keyword: bt.keyword,
+            intent: bt.intent,
+            difficulty: bt.difficulty,
+            priority: bt.priority,
+          }));
+          setTopics(loadedTopics);
+          setSelTopics(new Set(loadedTopics.map((t) => t.id)));
+        }
+      } catch (err) {
+        console.error("Failed to fetch store data:", err);
+        toast("Error loading store data");
+      } finally {
+        setLoading(false);
+      }
     };
-    const mm = (e: MouseEvent) => move(e.clientY);
-    const tm = (e: TouchEvent) => drag.current.active && move(e.touches[0].clientY);
-    const up = () => { drag.current.active = false; document.body.style.cursor = ""; };
-    window.addEventListener("mousemove", mm); window.addEventListener("mouseup", up);
-    window.addEventListener("touchmove", tm, { passive: true }); window.addEventListener("touchend", up);
-    return () => { window.removeEventListener("mousemove", mm); window.removeEventListener("mouseup", up); window.removeEventListener("touchmove", tm); window.removeEventListener("touchend", up); };
-  }, []);
+    fetchData();
+  }, [toast]);
 
-  const knobSz = size === "sm" ? 62 : 82;
-  const ptrH = size === "sm" ? 12 : 16;
-  const ptrTop = size === "sm" ? 8 : 10;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-      <div
-        ref={knobRef}
-        style={{
-          width: knobSz, height: knobSz, borderRadius: "50%", position: "relative", cursor: "grab",
-          background: "radial-gradient(circle at 50% 30%,rgba(255,255,255,.13),rgba(255,255,255,0) 46%),conic-gradient(from 0deg,#1e2030,#3a3e52,#181a28,#363a4e,#141620,#383c50,#1a1c2e,#363a4c,#1e2030),radial-gradient(circle at 50% 50%,#2c3044 0%,#141826 52%,#060810 100%)",
-          boxShadow: "0 2px 2px rgba(255,255,255,.1) inset,0 -7px 13px rgba(0,0,0,.7) inset,0 0 0 1px #050608,0 14px 22px -11px rgba(0,0,0,.6),0 4px 9px -4px rgba(0,0,0,.4)",
-          touchAction: "none",
-        }}
-        onMouseDown={(e) => { e.preventDefault(); drag.current = { active: true, startY: e.clientY, startVal: val }; document.body.style.cursor = "grabbing"; }}
-        onTouchStart={(e) => { drag.current = { active: true, startY: e.touches[0].clientY, startVal: val }; }}
-      >
-        <div ref={ringRef} style={{ position: "absolute", inset: 0, zIndex: 1 }} />
-        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", zIndex: 3, transform: `rotate(${val}deg)` }}>
-          <div style={{ position: "absolute", left: "50%", top: ptrTop, width: size === "sm" ? 3 : 3.5, height: ptrH, transform: "translateX(-50%)", background: "rgba(180,200,240,.85)", borderRadius: 3 }} />
-        </div>
-      </div>
-      <div style={{ fontSize: 11, color: "var(--ink-mid)", fontFamily: "'Space Mono',monospace", letterSpacing: ".06em" }}>{label}</div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   METER
-═══════════════════════════════════════════════════════════ */
-function Meter({ label }: { label: string }) {
-  const [lit, setLit] = useState(() => Array(27).fill(false));
+  // Position the foot-row "beam" under the currently selected knob on mount.
   useEffect(() => {
-    const tick = () => { const h = ((Math.random() * 6) | 0) + 2; setLit(Array.from({ length: 27 }, (_, i) => Math.floor(i / 3) >= 9 - h)); };
-    tick(); const id = setInterval(tick, 400); return () => clearInterval(id);
+    if (feedbackRef.current && footRef.current) {
+      const fr = footRef.current.getBoundingClientRect();
+      const tr = feedbackRef.current.getBoundingClientRect();
+      const cx = tr.left + tr.width / 2 - fr.left;
+      setOx(((cx / fr.width) * 100).toFixed(1) + "%");
+    }
   }, []);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,4px)", gap: 4 }}>
-        {lit.map((on, i) => (
-          <span key={i} style={{ width: 4, height: 4, borderRadius: 1, background: on ? "rgba(100,160,255,.75)" : "#1a1e2c", boxShadow: on ? "0 0 4px rgba(80,140,255,.6)" : "none", transition: "background .25s" }} />
-        ))}
-      </div>
-      <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "'Space Mono',monospace", letterSpacing: ".06em" }}>{label}</div>
-    </div>
-  );
-}
 
-/* ═══════════════════════════════════════════════════════════
-   PREVIEW MODAL
-═══════════════════════════════════════════════════════════ */
-const TOPIC_SUGGESTIONS = [
-  "10 Best Wireless Headphones 2024", "Smart Watch Buying Guide", "Top Laptop Bags for Professionals",
-  "Bluetooth Speaker Comparison", "Best Tech Gifts This Season", "Camera Accessories You Need",
-  "How to Choose the Right Earbuds", "Fitness Wearables Explained", "USB-C Hub Roundup",
-  "Budget vs Premium Headphones",
-];
+  // Once topics are loaded, merge in any product selection that was saved
+  // locally in a previous visit (matched by topic name, since topic ids are
+  // regenerated on every load).
+  useEffect(() => {
+    if (topics.length === 0) return;
+    try {
+      const raw = window.localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { items?: Array<{ name: string; products: string[] }> };
+      if (!parsed.items || !Array.isArray(parsed.items)) return;
+      setTopicProductsMap((prev) => {
+        const next = { ...prev };
+        parsed.items!.forEach((item) => {
+          const match = topics.find((t) => t.name === item.name);
+          if (match) next[match.id] = item.products;
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to load saved product selection:", err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topics]);
 
-function PreviewModal({ onClose, onGenerate }: { onClose: () => void; onGenerate: () => void }) {
-  const [selected, setSelected] = useState<string[]>([]);
-  const toggle = (t: string) => setSelected(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
-  return (
-    <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="db-modal">
-        <button className="db-modal-close" onClick={onClose}>✕</button>
-        <div className="db-modal-title">Topic Preview</div>
-        <div className="db-modal-sub">Select topics to include in your generated content</div>
-        <div className="db-modal-section">
-          <div className="db-modal-section-title">SUGGESTED TOPICS</div>
-          <div>{TOPIC_SUGGESTIONS.map(t => (
-            <button key={t} className={`db-topic-chip${selected.includes(t) ? " sel" : ""}`} onClick={() => toggle(t)}>{t}</button>
-          ))}</div>
-        </div>
-        <div className="db-modal-section">
-          <div className="db-modal-section-title">CUSTOM TOPIC</div>
-          <input style={{ width: "100%", background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 8, padding: "8px 12px", color: "var(--ink-bright)", fontSize: 13, outline: "none", fontFamily: "inherit" }} placeholder="Enter your own topic..." />
-        </div>
-        <MBtn label={`CONFIRM${selected.length > 0 ? ` (${selected.length})` : ""}`} variant="slate" lit onClick={() => { onGenerate(); onClose(); }} />
-      </div>
-    </div>
-  );
-}
+const clickKnob = (e: MouseEvent<HTMLDivElement>, id: string): void => {
+  if (selected === id) {
+    setSelected("");
+    return;
+  }
+  const tile = e.currentTarget;
+  if (footRef.current) {
+    const fr = footRef.current.getBoundingClientRect();
+    const tr = tile.getBoundingClientRect();
+    const cx = tr.left + tr.width / 2 - fr.left;
+    setOx(((cx / fr.width) * 100).toFixed(1) + "%");
+  }
+  setSelected(id);
+};
 
-/* ═══════════════════════════════════════════════════════════
-   KEYWORDS MODAL
-═══════════════════════════════════════════════════════════ */
-function KeywordsModal({ onClose }: { onClose: () => void }) {
-  const [sel, setSel] = useState<string[]>([]);
-  const toggle = (k: string) => setSel(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k]);
-  return (
-    <div className="db-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="db-modal" style={{ maxWidth: 680 }}>
-        <button className="db-modal-close" onClick={onClose}>✕</button>
-        <div className="db-modal-title">Keyword Library</div>
-        <div className="db-modal-sub">Select keywords to target in your generated content</div>
-        <div className="db-kw-hdr">
-          {["KEYWORD", "VOLUME", "DIFF", "INTENT"].map(h => <div key={h} className="db-kw-hdr-cell">{h}</div>)}
-        </div>
-        <div className="db-kw-table">
-          {KEYWORDS_DATA.map(k => (
-            <div key={k.kw} className={`db-kw-row${sel.includes(k.kw) ? " sel" : ""}`} onClick={() => toggle(k.kw)}>
-              <div className="db-kw-text">{k.kw}</div>
-              <div className="db-kw-vol">{k.vol}</div>
-              <div className="db-kw-diff" style={{ color: k.diff < 35 ? "#60d480" : k.diff < 50 ? "#e8c060" : "#ff8060" }}>{k.diff}</div>
-              <div><span className={`db-kw-intent intent-${k.intent}`}>{k.intent}</span></div>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <MBtn label={`USE SELECTED (${sel.length})`} variant="slate" lit={sel.length > 0} onClick={onClose} />
-        </div>
-      </div>
-    </div>
-  );
-}
+const getFootSwitches = (selectedKnob: string) => {
+  switch (selectedKnob) {
+    case "kFeedback":
+      return [
+        { label: "collections", on: true, onClick: () => setCollectionOpen(true) },
+        { label: "products", on: true, onClick: () => setProductOpen(true) },
+      ];
+    case "kLeft":
+      if (!storeData) return [];
+return storeData.competitors.map((c) => ({
+  label: c.name,
+  on: true,
+  onClick: () => setCompetitorModal(c),
+}));
+    case "kPreset":
+      return [
+        { label: "seasonal", on: true, onClick: () => setSeasonalOpen(true) },
+        { label: "cultural", on: true, onClick: () => setCulturalOpen(true) },
+        { label: "retail", on: true, onClick: () => setRetailOpen(true) },
+        { label: "experiential", on: true, onClick: () => setExperientialOpen(true) },
+      ];
+    case "kRight":
+      return [
+        { label: "short‑tail", on: true, onClick: () => setShortTailOpen(true) },
+        { label: "long‑tail", on: true, onClick: () => setLongTailOpen(true) },
+      ];
+    default:
+      return [
+        { label: "rec / overdub", on: true },
+        { label: "play / stop", on: false },
+        { label: "loop fx 1", on: false },
+        { label: "loop fx 2", on: true },
+      ];
+  }
+};
 
-/* ═══════════════════════════════════════════════════════════
-   SUB PANELS
-═══════════════════════════════════════════════════════════ */
-function StorePanel() {
-  const [tab, setTab] = useState<"collections" | "products">("collections");
-  const [selCol, setSelCol] = useState<string[]>([]);
-  const [selProd, setSelProd] = useState<string[]>([]);
-  const [focusCol, setFocusCol] = useState<string>("c1");
-
-  const toggleCol = (id: string) => {
-    setSelCol(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
-    setFocusCol(id);
+  const openWiz = (): void => {
+    if (!storeData) {
+      toast("Store data not loaded yet");
+      return;
+    }
+    setWizOpen(true);
+    setActiveStar(null);
+    setShowProductConfig(false);
+    setActiveTopicForProduct(null);
   };
-  const toggleProd = (id: string) => setSelProd(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const closeWiz = (): void => setWizOpen(false);
 
-  return (
-    <div className="db-sub">
-      <div className="db-sub-inner">
-        <div className="db-sub-tabs">
-          {(["collections", "products"] as const).map(t => (
-            <button key={t} className={`db-sub-tab${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-              {t === "collections" ? "📁 COLLECTIONS" : "📦 PRODUCTS"}
-            </button>
-          ))}
-        </div>
-        {tab === "collections" && (
-          <div className="db-chip-grid">
-            {COLLECTIONS.map(c => (
-              <button key={c.id} className={`db-chip${selCol.includes(c.id) ? " sel" : ""}`} onClick={() => toggleCol(c.id)}>
-                {c.name} <span className="db-chip-badge">{c.count}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        {tab === "products" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {COLLECTIONS.map(c => (
-                <button key={c.id} className={`db-chip${focusCol === c.id ? " sel" : ""}`} style={{ padding: "4px 10px", fontSize: 11 }} onClick={() => setFocusCol(c.id)}>
-                  {c.name}
-                </button>
-              ))}
-            </div>
-            <div className="db-prod-table">
-              {(PRODUCTS[focusCol] || []).map(p => (
-                <div key={p.id} className={`db-prod-row${selProd.includes(p.id) ? " sel" : ""}`} onClick={() => toggleProd(p.id)}>
-                  <div className="db-prod-name">{p.name}</div>
-                  <div className="db-prod-price">{p.price}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+  const toggleTopic = (id: string): void =>
+    setSelTopics((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      // If topic is removed, also remove its product selections
+      if (!next.has(id)) {
+        setTopicProductsMap((prevMap) => {
+          const newMap = { ...prevMap };
+          delete newMap[id];
+          return newMap;
+        });
+      }
+      return next;
+    });
 
-function CompetitorPanel() {
-  const [active, setActive] = useState<CompetitorId>("comp1");
-  const comp = COMPETITORS[active];
-  return (
-    <div className="db-sub">
-      <div className="db-sub-inner">
-        <div className="db-comp-tabs">
-          {(Object.keys(COMPETITORS) as CompetitorId[]).map((id, i) => (
-            <button key={id} className={`db-comp-tab${active === id ? " active" : ""}`} onClick={() => setActive(id)}>
-              <span className="comp-dot" />
-              COMP {i + 1}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div>
-            <div className="db-comp-domain">{comp.domain}</div>
-            <div className="db-comp-name">{comp.name}</div>
-          </div>
-          <div className="db-comp-info">
-            {[
-              { val: comp.da,       lbl: "Domain Authority" },
-              { val: comp.traffic,  lbl: "Monthly Traffic" },
-              { val: comp.keywords, lbl: "Ranking Keywords" },
-            ].map(s => (
-              <div key={s.lbl} className="db-comp-stat">
-                <div className="db-comp-stat-val">{s.val}</div>
-                <div className="db-comp-stat-lbl">{s.lbl}</div>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="db-comp-section-lbl">TOP PAGES</div>
-            <div>{comp.topPages.map(p => <span key={p} className="db-top-page">{p}</span>)}</div>
-          </div>
-          <div>
-            <div className="db-comp-section-lbl">WEAKNESSES TO EXPLOIT</div>
-            <div>{comp.weaknesses.map(w => <span key={w} className="db-weakness">{w}</span>)}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CalendarPanel() {
-  const [country, setCountry] = useState("United States");
-  const [selFestivals, setSelFestivals] = useState<string[]>([]);
-  const [autoAI, setAutoAI] = useState(false);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const festivals = FESTIVALS[country] || [];
-  const toggleFest = (f: string) => setSelFestivals(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f]);
-
-  return (
-    <div className="db-sub">
-      <div className="db-sub-inner">
-        <div className="db-cal">
-          <div className="db-cal-row">
-            <span className="db-cal-label">COUNTRY</span>
-            <select className="db-select" value={country} onChange={e => { setCountry(e.target.value); setSelFestivals([]); }}>
-              {COUNTRIES.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "'Space Mono',monospace", letterSpacing: ".1em", marginBottom: 8 }}>FESTIVALS & EVENTS</div>
-            <div className="db-festival-grid">
-              {festivals.map(f => (
-                <button key={f} className={`db-festival-chip${selFestivals.includes(f) ? " sel" : ""}`} onClick={() => !autoAI && toggleFest(f)} style={{ opacity: autoAI ? 0.4 : 1 }}>
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="db-cal-auto">
-            <input type="checkbox" checked={autoAI} onChange={e => { setAutoAI(e.target.checked); if (e.target.checked) setSelFestivals([]); }} />
-            Let AI pick festivals automatically
-          </label>
-          <div>
-            <div style={{ fontSize: 10, color: "var(--ink-dim)", fontFamily: "'Space Mono',monospace", letterSpacing: ".1em", marginBottom: 8 }}>SCHEDULE FOR FUTURE</div>
-            <div className="db-cal-schedule">
-              <input type="date" className="db-cal-input" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} />
-              <input type="time" className="db-cal-input" style={{ width: 120 }} defaultValue="09:00" />
-              <div style={{ fontSize: 11, color: "var(--ink-dim)" }}>
-                {selFestivals.length > 0 ? `${selFestivals.length} events selected` : autoAI ? "AI will schedule" : "No events selected"}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SearchConsolePanel() {
-  const [tab, setTab] = useState<SCTab>("overview");
-  const OVERVIEW = [
-    { val: "48.2k", lbl: "Total Clicks", fill: 72, change: "+12.4%", up: true },
-    { val: "1.24M", lbl: "Impressions",  fill: 88, change: "+8.1%",  up: true },
-    { val: "3.9%",  lbl: "Avg CTR",      fill: 39, change: "-0.3%",  up: false },
-    { val: "#14.2", lbl: "Avg Position", fill: 55, change: "+2.1",   up: true },
-  ];
-  const QUERIES = [
-    { q: "wireless headphones review",  clicks: "3.2k", imp: "82k",  pos: "8.4" },
-    { q: "best smart watch under 300",  clicks: "1.8k", imp: "44k",  pos: "11.2" },
-    { q: "portable bluetooth speaker",  clicks: "2.4k", imp: "61k",  pos: "6.1" },
-    { q: "buy laptop bag online",       clicks: "990",  imp: "28k",  pos: "14.5" },
-    { q: "tech gifts 2024",             clicks: "4.1k", imp: "110k", pos: "4.8" },
-  ];
-  const PAGES = [
-    { page: "/best-wireless-headphones", clicks: "4.1k", imp: "98k",  pos: "5.2" },
-    { page: "/smart-watch-guide",        clicks: "2.2k", imp: "54k",  pos: "9.1" },
-    { page: "/bluetooth-speaker-review", clicks: "3.0k", imp: "74k",  pos: "6.8" },
-    { page: "/tech-deals",               clicks: "1.5k", imp: "40k",  pos: "12.4" },
-  ];
-  return (
-    <div className="db-sub">
-      <div className="db-sub-inner">
-        <div className="db-sc-tabs">
-          {SEARCH_CONSOLE_TABS.map(t => (
-            <button key={t} className={`db-sc-tab${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
-              {t.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        {tab === "overview" && (
-          <div className="db-sc-grid">
-            {OVERVIEW.map(s => (
-              <div key={s.lbl} className="db-sc-card">
-                <div className="db-sc-val">{s.val}</div>
-                <div className="db-sc-lbl">{s.lbl}</div>
-                <div className={`db-sc-change ${s.up ? "db-sc-up" : "db-sc-down"}`}>{s.change}</div>
-                <div className="db-sc-bar"><div className="db-sc-fill" style={{ width: `${s.fill}%` }} /></div>
-              </div>
-            ))}
-          </div>
-        )}
-        {tab === "queries" && (
-          <div className="db-sc-table">
-            <div className="db-sc-row" style={{ background: "none", border: "none" }}>
-              {["QUERY", "CLICKS", "IMP", "POS"].map(h => <div key={h} className="db-kw-hdr-cell">{h}</div>)}
-            </div>
-            {QUERIES.map(q => (
-              <div key={q.q} className="db-sc-row">
-                <div className="db-sc-row-lbl">{q.q}</div>
-                <div className="db-sc-row-val">{q.clicks}</div>
-                <div className="db-sc-row-val">{q.imp}</div>
-                <div className="db-sc-row-val">{q.pos}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {tab === "pages" && (
-          <div className="db-sc-table">
-            <div className="db-sc-row" style={{ background: "none", border: "none" }}>
-              {["PAGE", "CLICKS", "IMP", "POS"].map(h => <div key={h} className="db-kw-hdr-cell">{h}</div>)}
-            </div>
-            {PAGES.map(p => (
-              <div key={p.page} className="db-sc-row">
-                <div className="db-sc-row-lbl" style={{ fontFamily: "'Space Mono',monospace", fontSize: 10, color: "rgba(100,160,255,.7)" }}>{p.page}</div>
-                <div className="db-sc-row-val">{p.clicks}</div>
-                <div className="db-sc-row-val">{p.imp}</div>
-                <div className="db-sc-row-val">{p.pos}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {tab === "devices" && (
-          <div style={{ display: "flex", gap: 10 }}>
-            {[{ d: "Mobile", pct: 62, c: "#4080ff" }, { d: "Desktop", pct: 31, c: "#8b5cf6" }, { d: "Tablet", pct: 7, c: "#22c888" }].map(d => (
-              <div key={d.d} style={{ flex: 1, background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.04)", borderRadius: 10, padding: "14px", textAlign: "center" }}>
-                <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Space Mono',monospace", color: d.c }}>{d.pct}%</div>
-                <div style={{ fontSize: 11, color: "var(--ink-mid)", marginTop: 4 }}>{d.d}</div>
-                <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,.05)", marginTop: 8, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${d.pct}%`, background: d.c, borderRadius: 2 }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   NAV CONFIG
-═══════════════════════════════════════════════════════════ */
-const NAV: { id: MainTab; label: string; icon: string }[] = [
-  { id: "store",         label: "Store",          icon: "🏪" },
-  { id: "competitor",    label: "Competitor",      icon: "⚔" },
-  { id: "calendar",      label: "Calendar",        icon: "📅" },
-  { id: "keywords",      label: "Keywords",        icon: "🔑" },
-  { id: "searchconsole", label: "Search Console",  icon: "📊" },
-];
-
-/* ═══════════════════════════════════════════════════════════
-   MAIN DASHBOARD
-═══════════════════════════════════════════════════════════ */
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<MainTab | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [showKeywords, setShowKeywords] = useState(false);
-
-  const handleGenerate = useCallback(async () => {
-    if (generating) return;
-    setGenerating(true); setGenerated(false);
-    await new Promise(r => setTimeout(r, 2000));
-    setGenerating(false); setGenerated(true);
-  }, [generating]);
-
-  const handleNavClick = (id: MainTab) => {
-    if (id === "keywords") { setShowKeywords(true); return; }
-    setActiveTab(prev => prev === id ? null : id);
+  const addCustomTopic = (): void => {
+    const value = custom.trim();
+    if (!value) return;
+    const topic: Topic = { id: uid(), name: value, keyword: "", intent: "", difficulty: "", priority: 0 };
+    setTopics((prev) => [...prev, topic]);
+    setSelTopics((prev) => new Set(prev).add(topic.id));
+    setCustom("");
   };
 
+  const selectedTopicList = (): Topic[] => topics.filter((t) => selTopics.has(t.id));
+
+  // Fetch products from Shopify with search query
+  const fetchProductsForSearch = useCallback(async (query: string) => {
+    setIsSearching(true);
+    try {
+      const params = query ? { search: query } : {};
+      console.log("Fetching products with params:", params);
+      const data = await ApiService.get(ApiConfig.PRODUCTS, query ? { search: query } : {});
+      const productList: Product[] = data || [];
+      setProductsSearchResults(productList);
+      setProductsCache((prev) => {
+        const newCache = { ...prev };
+        productList.forEach((p) => {
+          newCache[p.id] = p;
+        });
+        return newCache;
+      });
+    } catch (err) {
+      console.error("Failed to load products:", err);
+      toast("Failed to load products");
+    } finally {
+      setIsSearching(false);
+    }
+  }, [toast]);
+
+  // Debounced search handler
+  const handleProductSearch = useCallback((value: string) => {
+    setProductSearch(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      fetchProductsForSearch(value);
+    }, 300);
+  }, [fetchProductsForSearch]);
+
+  // Open product config view
+  const openProductConfig = async (): Promise<void> => {
+    if (selTopics.size === 0) {
+      toast("Select at least one topic first.");
+      return;
+    }
+    setShowProductConfig(true);
+    setActiveTopicForProduct(null);
+    setProductSearch("");
+    // Optionally fetch initial products without search (empty query)
+    fetchProductsForSearch("");
+  };
+
+  // Toggle a product for a specific topic
+  const toggleProductForTopic = (topicId: string, productId: string): void => {
+    setTopicProductsMap((prev) => {
+      const current = prev[topicId] || [];
+      if (current.includes(productId)) {
+        return { ...prev, [topicId]: current.filter(id => id !== productId) };
+      } else {
+        if (current.length >= 2) {
+          toast("Maximum 2 products per topic");
+          return prev;
+        }
+        return { ...prev, [topicId]: [...current, productId] };
+      }
+    });
+  };
+
+  // Save the current topic -> product selection locally (browser storage) so
+  // it survives closing this modal. The actual blog generation is triggered
+  // later, separately, from the "generator" knob.
+  const saveProductSelectionLocally = (): void => {
+    try {
+      const items = selectedTopicList().map((t) => ({
+        name: t.name,
+        keyword: t.keyword,
+        products: topicProductsMap[t.id] || [],
+      }));
+      window.localStorage.setItem(LS_KEY, JSON.stringify({ items, savedAt: Date.now() }));
+      toast("Product selection saved locally");
+      closeWiz();
+    } catch (err) {
+      console.error("Failed to save selection locally:", err);
+      toast("Failed to save selection");
+    }
+  };
+
+  // Start blog generation sequentially
+  const startGeneration = async (): Promise<void> => {
+    closeWiz();
+    const selTopicsArr = selectedTopicList();
+    if (selTopicsArr.length === 0) {
+      toast("No topics selected");
+      return;
+    }
+    setBlogs([]);
+    setBlogOpen(true);
+    setGenerating(true);
+
+    toast("Generating blogs…");
+    for (const topic of selTopicsArr) {
+      const productIds = topicProductsMap[topic.id] || [];
+      try {
+        const res = await ApiService.post(ApiConfig.CREATE_BLOG, {
+          topic: topic.name,
+          products: productIds,
+        });
+        const blogData = res?.blog || res;
+        let heroImg = blogData.heroImage?.url;
+        if (heroImg && heroImg.startsWith('/')) {
+          heroImg = "http://localhost:5000" + heroImg;
+        }
+        console.log(`Generated blog for topic "${heroImg}":`, blogData);
+        if (blogData) {
+          const newBlog: Blog = {
+            id: blogData._id || uid(),
+            topic: topic.name,
+            title: blogData.title || topic.name,
+            html: blogData.content || "",
+            status: "none",
+            heroImageUrl: heroImg,
+            heroImagePrompt: blogData.heroImagePrompt,
+          };
+          setBlogs((prev) => [...prev, newBlog]);
+        }
+      } catch (err) {
+        console.error(`Failed to generate blog for topic "${topic.name}":`, err);
+        toast(`Error generating blog for "${topic.name}"`);
+        // Still continue with next topics
+      }
+    }
+    setGenerating(false);
+    toast("All blogs generated!");
+  };
+
+  // Entry point for the "generator" knob: does NOT open the wizard, just
+  // uses whatever topics/products are currently selected (including
+  // anything restored from local storage) and kicks off generation directly.
+  const handleGeneratorClick = (): void => {
+    if (!storeData) {
+      toast("Store data not loaded yet");
+      return;
+    }
+    if (selTopics.size === 0) {
+      toast("Select topics first (tap preview)");
+      return;
+    }
+    startGeneration();
+  };
+
+  // Bulk actions for all blogs
+  const bulkAction = async (action: "draft" | "pub" | "sched"): Promise<void> => {
+    for (const blog of blogs) {
+      try {
+        const endpoint = action === "draft" ? ApiConfig.saveBlogDraft : ApiConfig.publishBlog;
+        await ApiService.post(endpoint, { blogId: blog.id, title: blog.title, html: blog.html });
+        // update local status
+        setBlogs((prev) =>
+          prev.map((b) => (b.id === blog.id ? { ...b, status: action === "draft" ? "draft" : "pub" } : b))
+        );
+      } catch (err) {
+        console.error(`Failed to ${action} blog ${blog.id}:`, err);
+      }
+    }
+    toast(`All blogs ${action === "draft" ? "saved as draft" : action === "pub" ? "published" : "scheduled"}`);
+  };
+
+  const handleGenerateCampaign = async () => {
+  // Basic validation
+  if (!campaignCompetitorUrl) {
+    toast("Please select a competitor URL");
+    return;
+  }
+  if (!campaignCalendar.type || !campaignCalendar.name) {
+    toast("Please fill in the calendar event");
+    return;
+  }
+
+  // Build payload matching GenerateCampaignBlogDto
+  const payload = {
+    collections: campaignCollections,
+    products: campaignProducts,
+    competitorUrl: campaignCompetitorUrl,
+    calendar: {
+      type: campaignCalendar.type,
+      name: campaignCalendar.name,
+      country: campaignCalendar.country || undefined,
+      date: campaignCalendar.date || undefined,
+    },
+    keywords: {
+      shortTail: campaignKeywords.shortTail || undefined,
+      longTail: campaignKeywords.longTail || undefined,
+    },
+  };
+
+  setGenerating(true);
+  toast("Generating campaign blog…");
+  try {
+    const res = await ApiService.post(ApiConfig.GENERATE_BLOGCAMPAIGN, payload);
+    const blogData = res?.blog || res; // adjust depending on actual response shape
+
+    let heroImg = blogData.heroImage?.url;
+    if (heroImg && heroImg.startsWith('/')) {
+      heroImg = "http://localhost:5000" + heroImg;
+    }
+
+    const newBlog: Blog = {
+      id: blogData._id || uid(),
+      topic: blogData.topic || campaignCalendar.name,
+      title: blogData.title || "Campaign Blog",
+      html: blogData.content || "",
+      status: "none",
+      heroImageUrl: heroImg,
+      heroImagePrompt: blogData.heroImagePrompt,
+    };
+
+    setBlogs([newBlog]);   // assuming single blog returned; wrap in array
+    setBlogOpen(true);
+    toast("Campaign blog generated!");
+  } catch (err) {
+    console.error("Failed to generate campaign blog:", err);
+    toast("Error generating campaign blog");
+  } finally {
+    setGenerating(false);
+  }
+};
+
+
+if (loading) {
   return (
-    <div className="db-root">
-      <style>{CSS}</style>
-
-      {showPreview && <PreviewModal onClose={() => setShowPreview(false)} onGenerate={handleGenerate} />}
-      {showKeywords && <KeywordsModal onClose={() => setShowKeywords(false)} />}
-
-      <div className="db-chassis">
-
-        {/* ── TOP BAR ── */}
-        <div className="db-topbar">
-          {/* left: logo + 2 metallic action buttons */}
-          <div className="db-topbar-left">
-            <div className="db-topbar-logo-dot" />
-            <span className="db-topbar-title">Content Engine</span>
-            <div className="db-top-btns">
-              <MBtn label="PREVIEW" variant="chrome" onClick={() => setShowPreview(true)} />
-              <MBtn label="GENERATE" variant="slate" lit={generating || generated} onClick={handleGenerate} />
-            </div>
+    <>
+      <style>{`
+        @keyframes spinPortal {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes pulseCore {
+          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+          50% { transform: translate(-50%, -50%) scale(1.6); opacity: 1; }
+        }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 1; }
+        }
+        .space-loader {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: radial-gradient(ellipse at 50% 40%, #0b0e1a 0%, #05070e 100%);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          z-index: 9999;
+        }
+        .loader-portal {
+          position: relative;
+          width: 220px;
+          height: 220px;
+        }
+        .loader-ring {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          border-radius: 50%;
+          border: 1.5px solid rgba(140, 175, 255, 0.18);
+          pointer-events: none;
+          animation: spinPortal 8s linear infinite;
+        }
+        .loader-ring.r1 { width: 30%; height: 30%; animation-duration: 10s; }
+        .loader-ring.r2 { width: 52%; height: 52%; animation-duration: 7s; animation-direction: reverse; }
+        .loader-ring.r3 { width: 74%; height: 74%; animation-duration: 12s; }
+        .loader-ring.r4 { width: 94%; height: 94%; animation-duration: 6s; animation-direction: reverse; }
+        .loader-core {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 34px;
+          height: 34px;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          background: radial-gradient(circle at 50% 40%, #eaf2ff, #6ea2ff 58%, rgba(60,110,255,0));
+          box-shadow: 0 0 40px 12px rgba(110, 160, 255, 0.7);
+          animation: pulseCore 2.4s ease-in-out infinite;
+        }
+        .loader-stars {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+        .star-dot {
+          position: absolute;
+          width: 3px;
+          height: 3px;
+          background: #ffffff;
+          border-radius: 50%;
+          animation: twinkle 2s ease-in-out infinite alternate;
+        }
+        .star-dot:nth-child(1) { left: 10%; top: 15%; animation-delay: 0.2s; width: 4px; height: 4px; }
+        .star-dot:nth-child(2) { left: 85%; top: 25%; animation-delay: 0.8s; }
+        .star-dot:nth-child(3) { left: 20%; top: 75%; animation-delay: 1.2s; width: 5px; height: 5px; }
+        .star-dot:nth-child(4) { left: 70%; top: 80%; animation-delay: 0.5s; }
+        .star-dot:nth-child(5) { left: 45%; top: 10%; animation-delay: 1.8s; width: 3px; height: 3px; }
+        .star-dot:nth-child(6) { left: 5%; top: 50%; animation-delay: 0.1s; width: 2px; height: 2px; }
+        .star-dot:nth-child(7) { left: 92%; top: 55%; animation-delay: 1.5s; width: 4px; height: 4px; }
+        .loader-text {
+          position: absolute;
+          bottom: -60px;
+          left: 50%;
+          transform: translateX(-50%);
+          color: #aebbe0;
+          font-size: 18px;
+          font-weight: 300;
+          letter-spacing: 4px;
+          text-transform: uppercase;
+          white-space: nowrap;
+          animation: twinkle 2.4s ease-in-out infinite;
+        }
+      `}</style>
+      <div className="space-loader">
+        <div className="loader-portal">
+          {/* Rings */}
+          <div className="loader-ring r1" />
+          <div className="loader-ring r2" />
+          <div className="loader-ring r3" />
+          <div className="loader-ring r4" />
+          {/* Core */}
+          <div className="loader-core" />
+          {/* Stars */}
+          <div className="loader-stars">
+            <div className="star-dot" />
+            <div className="star-dot" />
+            <div className="star-dot" />
+            <div className="star-dot" />
+            <div className="star-dot" />
+            <div className="star-dot" />
+            <div className="star-dot" />
           </div>
-
-          {/* right: big generate */}
-          <div className="db-topbar-right">
-            <button
-              type="button"
-              className={`db-mbtn big-gen${generating || generated ? " lit" : ""}`}
-              onClick={handleGenerate}
-              disabled={generating}
-            >
-              <div className="db-mbtn-pip" />
-              {generating ? "GENERATING..." : generated ? "DONE — RUN AGAIN" : "GENERATE"}
-              <span style={{ fontSize: 14, color: "rgba(200,215,255,.6)", marginLeft: 4 }}>→</span>
-            </button>
-          </div>
+          {/* Label */}
+          <div className="loader-text">Loading</div>
         </div>
+      </div>
+    </>
+  );
+}
 
-        {/* ── MAIN LAYOUT ── */}
-        <div className="db-layout">
-
-          {/* LEFT KNOBS */}
-          <div className="db-col-btns">
-            <Meter label="traffic" />
-            <Knob size="md" label="volume" defaultVal={-28} />
-            <Knob size="sm" label="depth"  defaultVal={50} />
-          </div>
-
-          {/* CENTER */}
-          <div className="db-center-col">
-
-            {/* SCREEN */}
-            <div className="db-screen">
-              <div className="db-screen-hdr">
-                <div className="db-screen-logo"><i /><i /><i /></div>
-                <div className="db-screen-name">ONLY · 1 DASHBOARD</div>
-                <div className="db-screen-status">
-                  {generating ? "● GENERATING" : generated ? "● READY" : "○ STANDBY"}
-                </div>
-              </div>
-
-              {/* NAV TABS */}
-              <div className="db-nav">
-                {NAV.map(n => (
-                  <button
-                    key={n.id}
-                    className={`db-nav-btn${activeTab === n.id ? " active" : ""}`}
-                    onClick={() => handleNavClick(n.id)}
-                  >
-                    <span className="nav-dot" />
-                    <span className="db-nav-icon">{n.icon}</span>
-                    {n.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* SCREEN STATS */}
-              <div className="db-screen-strip">
-                {[
-                  { val: "2.4k", lbl: "Articles", fill: 66 },
-                  { val: "94%",  lbl: "Rank Rate", fill: 94 },
-                  { val: "18k",  lbl: "Traffic",   fill: 55 },
-                  { val: "#12",  lbl: "Position",  fill: 40 },
-                ].map(s => (
-                  <div key={s.lbl} className="db-strip-card">
-                    <div className="db-strip-val">{s.val}</div>
-                    <div className="db-strip-lbl">{s.lbl}</div>
-                    <div className="db-strip-bar"><div className="db-strip-fill" style={{ width: `${s.fill}%` }} /></div>
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <div className="lvx-root">
+        <div className="stage">
+          <div className="pedal">
+            <div className="panel-grid">
+              <div className="knob-panel">
+                <div className="head-row">
+                  {/* Wide tile: preview opens topic selection, generator triggers blog generation directly */}
+                  <div className="face tile wide-tile">
+                    <div className="duo">
+                      <div className="knob-unit" style={{ cursor: "pointer" }} onClick={openWiz}>
+                        <div className="knob white" id="kPreview">
+                          <div className="pointer" />
+                        </div>
+                        <span className="label">preview</span>
+                      </div>
+                      <div className="knob-unit" style={{ cursor: "pointer" }} onClick={handleGeneratorClick}>
+                        <div className="knob white" id="kGenerator">
+                          <div className="pointer" />
+                        </div>
+                        <span className="label">generator</span>
+                      </div>
+                    </div>
                   </div>
-                ))}
+
+                  {/* Screen */}
+                  <div className="screen">
+                    <div className="pitch left">
+                      <VU side="left" />
+                      <div className="meta">
+                        <div className="val">{storeData?.primaryMarket || "US"}</div>
+                        <div className="cap">market</div>
+                      </div>
+                    </div>
+                    <div className="screen-center">
+                      <div className="logo">
+                        <svg viewBox="0 0 44 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M3 25 V13 a8 8 0 0 1 16 0 V25" stroke="#ededed" strokeWidth="4.4" strokeLinecap="round" />
+                          <path d="M25 25 V13 a8 8 0 0 1 16 0 V25" stroke="#ededed" strokeWidth="4.4" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div className="preset-name">
+                        {storeData?.niche ? storeData.niche.slice(0, 30) + "…" : "multi voice"}
+                      </div>
+                      <div className="preset-num">{storeData?.blogTopics?.length || 0}</div>
+                    </div>
+                    <div className="pitch right">
+                      <VU side="right" />
+                      <div className="meta">
+                        <div className="val">{storeData?.language || "EN"}</div>
+                        <div className="cap">lang</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mix knob */}
+                  <div className="face tile" onClick={handleGenerateCampaign}>
+                    <div className="knob-unit">
+                      <div className="knob white" id="kMix">
+                        <div className="pointer" />
+                      </div>
+                      <span className="label">Generate</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Knob row */}
+                <div className="knob-row">
+                  {KNOBS.map((k) => (
+                    <div
+                      key={k.id}
+                      className={"face tile" + (selected === k.id ? " selected" : "")}
+                      ref={k.id === "kFeedback" ? feedbackRef : undefined}
+                      onClick={(e) => clickKnob(e, k.id)}
+                    >
+                      <div className="knob-unit">
+                        <div className="knob black" id={k.id}>
+                          <div className="pointer" />
+                        </div>
+                        <span className="label">{k.label}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <span className="arrow l">&#10216;</span>
+                  <span className="arrow r">&#10217;</span>
+                </div>
               </div>
-            </div>
 
-            {/* SUB PANEL — rendered below screen when a tab is active */}
-            {activeTab === "store"         && <StorePanel />}
-            {activeTab === "competitor"    && <CompetitorPanel />}
-            {activeTab === "calendar"      && <CalendarPanel />}
-            {activeTab === "searchconsole" && <SearchConsolePanel />}
+              {/* Foot row */}
+              <div
+  className={"foot-row" + (selected ? " linked-green" : "")}
+  ref={footRef}
+  style={{ "--ox": ox } as React.CSSProperties}
+>
 
-            {/* BIG GENERATE */}
-            <button
-              type="button"
-              className={`db-big-gen${generating || generated ? " active" : ""}`}
-              onClick={handleGenerate}
-              disabled={generating}
-            >
-              <div className="db-big-gen-led" />
-              <span style={{ position: "relative", zIndex: 1 }}>
-                {generating ? "GENERATING CONTENT..." : generated ? "CONTENT READY — RUN AGAIN" : "GENERATE CONTENT"}
-              </span>
-              <span className="db-gen-arrow">→</span>
-            </button>
-
-          </div>
-
-          {/* RIGHT KNOBS */}
-          <div className="db-col-btns">
-            <Meter label="rank" />
-            <Knob size="md" label="tone"  defaultVal={20} />
-            <Knob size="sm" label="style" defaultVal={-38} />
-          </div>
-
-        </div>
-
-        <div className="db-brand">only·1 · dashboard</div>
+  {getFootSwitches(selected).map((sw, i) => (
+    <div key={i} className="fs-tile" onClick={sw.onClick} style={sw.onClick ? { cursor: "pointer" } : {}}>
+      <div className="switch-unit">
+        <div className={"led" + (sw.on ? " on" : "")} />
+        <div className="footswitch" />
+        <div className="sw-label">{sw.label}</div>
       </div>
     </div>
+  ))}
+
+  <div className="brand"> meris <span className="box">lvx</span> </div>
+</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {collectionOpen && (
+  <CollectionModal
+    onClose={() => setCollectionOpen(false)}
+    onSave={(ids) => setCampaignCollections(ids)}
+    selectedIds={campaignCollections}
+  />
+)}
+{productOpen && (
+  <ProductModal
+    onClose={() => setProductOpen(false)}
+    onSave={(ids) => setCampaignProducts(ids)}
+    selectedIds={campaignProducts}
+    collectionIds={campaignCollections}
+  />
+)}
+{competitorModal && (
+  <CompetitorDetailModal
+    competitor={competitorModal}
+    isSelected={campaignCompetitorUrl === competitorModal.website}
+    onSelect={(url) => setCampaignCompetitorUrl(url)}
+    onClose={() => setCompetitorModal(null)}
+  />
+)}
+{seasonalOpen && (
+  <SeasonalModal
+    onClose={() => setSeasonalOpen(false)}
+    onSave={(data) => setCampaignCalendar(data)}
+    initialData={campaignCalendar.type === "seasonal" ? campaignCalendar : undefined}
+  />
+)}
+{culturalOpen && (
+  <CulturalModal
+    onClose={() => setCulturalOpen(false)}
+    onSave={(data) => setCampaignCalendar(data)}
+    initialData={campaignCalendar.type === "cultural" ? campaignCalendar : undefined}
+  />
+)}
+{retailOpen && (
+  <RetailModal
+    onClose={() => setRetailOpen(false)}
+    onSave={(data) => setCampaignCalendar(data)}
+    initialData={campaignCalendar.type === "retail" ? campaignCalendar : undefined}
+  />
+)}
+{experientialOpen && (
+  <ExperientialModal
+    onClose={() => setExperientialOpen(false)}
+    onSave={(data) => setCampaignCalendar(data)}
+    initialData={campaignCalendar.type === "experiential" ? campaignCalendar : undefined}
+  />
+)}
+{shortTailOpen && (
+  <ShortTailKeywordsModal
+    onClose={() => setShortTailOpen(false)}
+    onSave={(kws) => setCampaignKeywords(prev => ({ ...prev, shortTail: kws }))}
+    availableKeywords={storeData?.shortTailKeywords || []}
+    initialSelected={campaignKeywords.shortTail || []}
+  />
+)}
+{longTailOpen && (
+  <LongTailKeywordsModal
+    onClose={() => setLongTailOpen(false)}
+    onSave={(kws) => setCampaignKeywords(prev => ({ ...prev, longTail: kws }))}
+    availableKeywords={storeData?.longTailKeywords || []}
+    initialSelected={campaignKeywords.longTail || []}
+  />
+)}
+
+
+      {/* Wizard overlay */}
+      {wizOpen && (
+        <div className="ov open">
+          <div className="ov-bd" onClick={closeWiz} />
+          <button className="wiz-x" onClick={closeWiz}>×</button>
+          <div className="portal-wrap">
+            {activeStar === null && !showProductConfig && (
+              <div className="portal" id="portalHome">
+                <span className="pring r1" />
+                <span className="pring r2" />
+                <span className="pring r3" />
+                <span className="pring r4" />
+                <div className="portal-core" />
+                <div className="portal-hint">✦ Tap a star to explore</div>
+                <button
+                  className={"pstar big" + (selTopics.size > 0 ? " done" : "")}
+                  style={{ left: "28%", top: "38%" }}
+                  onClick={() => setActiveStar("topics")}
+                >
+                  <span className="pstar-dot" />
+                  <span className="pstar-label">Topics</span>
+                </button>
+                <button
+                  className={"pstar big" + (selTopics.size > 0 ? " done" : "")}
+                  style={{ right: "8%", top: "38%" }}
+                  onClick={() => {
+                    if (selTopics.size === 0) {
+                      toast("Select topics first");
+                      return;
+                    }
+                    setActiveStar("topics");
+                    setShowProductConfig(true);
+                  }}
+                >
+                  <span className="pstar-dot" />
+                  <span className="pstar-label">Product</span>
+                </button>
+                {/* New Blogs button */}
+                <button
+                  className="pstar big"
+                  style={{ left: "50%", top: "80%" }}
+                  onClick={() => {
+                    closeWiz();
+                    setBlogOpen(true);
+                  }}
+                >
+                  <span className="pstar-dot" />
+                  <span className="pstar-label">Blogs</span>
+                </button>
+                <button
+                  className="portal-save"
+                  onClick={() => {
+                    closeWiz();
+                    toast("Ready to generate blogs");
+                  }}
+                >
+                  Save & close
+                </button>
+              </div>
+            )}
+
+            {activeStar === "topics" && !showProductConfig && (
+              <div className="cardhost open">
+                <div className="card">
+                  <div className="cardtop">
+                    <button className="btn btn-gho btn-sm" onClick={() => setActiveStar(null)}>
+                      ✦ Stars
+                    </button>
+                    <h3>Blog Topics</h3>
+                  </div>
+                  <div className="sub">
+                    Select topics to generate blog posts. All topics are from your store analysis.
+                  </div>
+                  <div className="chips">
+                    {topics.map((t) => (
+                      <div
+                        key={t.id}
+                        className={"chip" + (selTopics.has(t.id) ? " sel" : "")}
+                        onClick={() => toggleTopic(t.id)}
+                      >
+                        {t.name}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="field" style={{ marginTop: 12 }}>
+                    <input
+                      placeholder="Add your own topic + Enter"
+                      value={custom}
+                      onChange={(e) => setCustom(e.target.value)}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (e.key === "Enter") addCustomTopic();
+                      }}
+                    />
+                    <button className="btn btn-gho" onClick={addCustomTopic}>Add</button>
+                  </div>
+                  <div className="wiz-foot">
+                    <span className="muted">{selTopics.size} selected</span>
+                    <button
+                      className="btn btn-pri"
+                      disabled={selTopics.size === 0}
+                      onClick={closeWiz}
+                    >
+                      Done — close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Product configuration view – reached via the "Product" star.
+                Saves the selection locally instead of generating right away;
+                generation now happens separately from the "generator" knob. */}
+            {activeStar === "topics" && showProductConfig && (
+              <div className="cardhost open w-full h-full">
+                <div className="card">
+                  <div className="cardtop">
+                    <button className="btn btn-gho btn-sm" onClick={() => setShowProductConfig(false)}>
+                      ← Back to Topics
+                    </button>
+                    <h3>Select Products (max 2 per topic)</h3>
+                  </div>
+                  <div className="sub">
+                    Assign products to each selected topic (optional), then save.
+                  </div>
+                  <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                    {selectedTopicList().map((topic) => (
+                      <div key={topic.id} style={{ marginBottom: "1.2rem", borderBottom: "1px solid rgba(130,160,255,.15)", paddingBottom: "1rem" }}>
+                        <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#fff" }}>
+                          {topic.name}
+                          <span style={{ fontSize: "12px", color: "#8ea0cc", marginLeft: "8px" }}>
+                            ({topicProductsMap[topic.id]?.length || 0}/2 products)
+                          </span>
+                        </div>
+                        <div className="product-search-box">
+                          <span className="search-icon">🔍</span>
+                          <input
+                            type="text"
+                            placeholder="Search products…"
+                            value={activeTopicForProduct === topic.id ? productSearch : ""}
+                            onChange={(e) => {
+                              setActiveTopicForProduct(topic.id);
+                              handleProductSearch(e.target.value);
+                            }}
+                            onClick={() => setActiveTopicForProduct(topic.id)}
+                          />
+                          {isSearching && activeTopicForProduct === topic.id && (
+                            <span className="loading-spinner spin" />
+                          )}
+                        </div>
+                        {activeTopicForProduct === topic.id && (
+                          <div className="prod-grid">
+                            {productsSearchResults.map((prod) => {
+                              const selected = (topicProductsMap[topic.id] || []).includes(prod.id);
+                              return (
+                                <div
+                                  key={prod.id}
+                                  className={`prod-card ${selected ? "sel" : ""}`}
+                                  onClick={() => toggleProductForTopic(topic.id, prod.id)}
+                                >
+                                  {prod.image ? (
+                                    <img src={prod.image} alt={prod.title} />
+                                  ) : (
+                                    <div style={{ height: "80px", background: "#1a1e2e", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#6a6e80" }}>No img</div>
+                                  )}
+                                  <div className="prod-name">{prod.title}</div>
+                                  <div className="prod-price">{prod.price} {prod.currency}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {/* Show selected products even when not active */}
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "4px" }}>
+                          {(topicProductsMap[topic.id] || []).map((prodId) => {
+                            const prod = productsCache[prodId];
+                            return prod ? (
+                              <span key={prodId} style={{ fontSize: "11px", background: "rgba(40,55,95,.8)", padding: "2px 6px", borderRadius: "999px", color: "#cdd7f5" }}>
+                                {prod.title}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="wiz-foot">
+                    <span className="muted">{selectedTopicList().length} topics configured</span>
+                    <button className="btn btn-pri" onClick={saveProductSelectionLocally}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeStar === "products" && storeData && (
+              <div className="cardhost open">
+                <div className="card">
+                  <div className="cardtop">
+                    <button className="btn btn-gho btn-sm" onClick={() => setActiveStar(null)}>
+                      ✦ Stars
+                    </button>
+                    <h3>Store Overview</h3>
+                  </div>
+                  <div className="sub">Key information from your store analysis.</div>
+                  <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                    <p><strong>Niche:</strong> {storeData.niche}</p>
+                    <p><strong>Business Summary:</strong> {storeData.businessSummary}</p>
+                    <p><strong>Target Audience:</strong> {storeData.targetAudience}</p>
+                    <p><strong>Brand Voice:</strong> {storeData.brandVoice}</p>
+                    <p><strong>Primary Market:</strong> {storeData.primaryMarket}</p>
+                    <p><strong>Short-tail Keywords:</strong> {storeData.shortTailKeywords.join(", ")}</p>
+                    <p><strong>Long-tail Keywords:</strong> {storeData.longTailKeywords.join(", ")}</p>
+                    <p><strong>Customer Pain Points:</strong> {storeData.customerPainPoints.join("; ")}</p>
+                    <p><strong>Customer Goals:</strong> {storeData.customerGoals.join("; ")}</p>
+                    <p><strong>FAQ Ideas:</strong> {storeData.faqIdeas.join("; ")}</p>
+                    <p><strong>SEO Suggestions:</strong> {storeData.seoSuggestions.join("; ")}</p>
+                  </div>
+                  <div className="wiz-foot">
+                    <span />
+                    <button className="btn btn-pri" onClick={() => setActiveStar(null)}>
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeStar === "collection" && storeData && (
+              <div className="cardhost open">
+                <div className="card">
+                  <div className="cardtop">
+                    <button className="btn btn-gho btn-sm" onClick={() => setActiveStar(null)}>
+                      ✦ Stars
+                    </button>
+                    <h3>Content Pillars</h3>
+                  </div>
+                  <div className="sub">
+                    Recommended content pillars from AI analysis.
+                  </div>
+                  <div className="chips">
+                    {storeData.contentPillars.map((pillar, idx) => (
+                      <div key={idx} className="chip sel">
+                        {pillar}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: "1rem" }}>
+                    <p><strong>AI Recommendations:</strong></p>
+                    <ul style={{ color: "#cdd7f5", paddingLeft: "1.2rem" }}>
+                      {storeData.aiRecommendations.map((rec, i) => (
+                        <li key={i} style={{ marginBottom: "0.5rem" }}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="wiz-foot">
+                    <span />
+                    <button className="btn btn-pri" onClick={() => setActiveStar(null)}>
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {blogOpen && (
+        <BlogEditorModal
+          blogs={blogs}
+          generating={generating}
+          onClose={() => setBlogOpen(false)}
+          toast={toast}
+        />
+      )}
+      {/* {blogOpen && (
+  <BlogEditorModal
+    blogs={blogs}
+    generating={generating}
+    onClose={() => setBlogOpen(false)}
+    toast={toast}
+  />
+)} */}
+
+      {/* Toast */}
+      <div className={"toast" + (toastMsg ? " show" : "")}>{toastMsg}</div>
+    </>
   );
-}
+};
+
+export default MerisLVX;
