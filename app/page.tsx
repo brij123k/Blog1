@@ -140,13 +140,13 @@ function hideGlobe() {
     // PHASE 5 — after all fragments faded + 0.8s gap → logo rises and stays,
     // then redirect to /welcome
     setTimeout(function () {
-      const logoWrap = document.getElementById("logo-wrap");
       if (!logoWrap) return;
       state = 'logoVisible';
       logoWrap.classList.add('visible');
-      // Redirect after a short delay to ensure logo is shown
-      setTimeout(function() {
-        window.location.href = '/welcome';
+
+      // Redirect after logo is shown
+      setTimeout(function () {
+        window.location.assign('/welcome');
       }, 1500);
     }, totalFadeTime + 800);
 
