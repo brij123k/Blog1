@@ -1,7 +1,8 @@
 import { getShopifyData } from "./shopify";
 import { storage } from "./storage";
 
-const API = "http://localhost:5000";
+// const API = "http://localhost:5000";
+const API = "https://hammerhead-app-7hn5u.ondigitalocean.app";
 
 export async function authenticateShopify() {
   const shopify = getShopifyData();

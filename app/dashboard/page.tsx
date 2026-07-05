@@ -1321,8 +1321,11 @@ return storeData.competitors.map((c) => ({
         });
         const blogData = res?.blog || res;
         let heroImg = blogData.heroImage?.url;
+        // if (heroImg && heroImg.startsWith('/')) {
+        //   heroImg = "http://localhost:5000" + heroImg;
+        // }
         if (heroImg && heroImg.startsWith('/')) {
-          heroImg = "http://localhost:5000" + heroImg;
+          heroImg = "https://hammerhead-app-7hn5u.ondigitalocean.app" + heroImg;
         }
         console.log(`Generated blog for topic "${heroImg}":`, blogData);
         if (blogData) {
@@ -1414,9 +1417,13 @@ return storeData.competitors.map((c) => ({
     const blogData = res?.blog || res; // adjust depending on actual response shape
 
     let heroImg = blogData.heroImage?.url;
+    // if (heroImg && heroImg.startsWith('/')) {
+    //   heroImg = "http://localhost:5000" + heroImg;
+    // }
     if (heroImg && heroImg.startsWith('/')) {
-      heroImg = "http://localhost:5000" + heroImg;
+      heroImg = "https://hammerhead-app-7hn5u.ondigitalocean.app" + heroImg;
     }
+    
 
     const newBlog: Blog = {
       id: blogData._id || uid(),
