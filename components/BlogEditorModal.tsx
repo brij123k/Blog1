@@ -99,7 +99,9 @@ const BlogEditorCard: FC<{
 
     setBusy(true);
     try {
-      const endpoint = action === "draft" ? ApiConfig.saveBlogDraft : ApiConfig.PUBLISH_BLOG(blog.id);
+      const endpoint = action === "draft"
+        ? ApiConfig.saveBlogDraft(blog.id)
+        : ApiConfig.PUBLISH_BLOG(blog.id);
       await ApiService.post(endpoint, { blogId: blog.id, title, html });
       updateStatus(action === "draft" ? "draft" : "pub");
       toast(action === "draft" ? "Saved to draft" : "Published");
@@ -222,7 +224,9 @@ const BlogEditorModal: FC<BlogEditorModalProps> = ({ blogs, generating, onClose,
   const bulkAction = async (action: "draft" | "pub") => {
     for (const blog of localBlogs) {
       try {
-        const endpoint = action === "draft" ? ApiConfig.saveBlogDraft : ApiConfig.PUBLISH_BLOG(blog.id);
+        const endpoint = action === "draft"
+          ? ApiConfig.saveBlogDraft(blog.id)
+          : ApiConfig.PUBLISH_BLOG(blog.id);
         await ApiService.post(endpoint, { blogId: blog.id, title: blog.title, html: blog.html });
       } catch (err) {
         console.error(`Failed to ${action} blog ${blog.id}:`, err);

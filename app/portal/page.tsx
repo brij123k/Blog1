@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import CosmicBackgroundWrapper from "../components/CosmicBackgroundWrapper";
 
 /* ─── seeded random so stars don't shift on re-render ─── */
 function seededRand(seed: number) {
@@ -302,7 +301,6 @@ export default function PortalPage() {
   };
 
   return (
-    <CosmicBackgroundWrapper>
       <div className="relative flex items-center justify-center w-full min-h-screen overflow-hidden">
         {/* ── Google Fonts ── */}
         <style>{`
@@ -617,6 +615,5 @@ export default function PortalPage() {
         </div>
         {/* end portal */}
       </div>
-    </CosmicBackgroundWrapper>
   );
 }

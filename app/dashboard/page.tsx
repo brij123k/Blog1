@@ -64,7 +64,11 @@ interface Topic {
   difficulty: string;
   priority: number;
 }
-
+interface FootSwitch {
+  label: string;
+  on: boolean;
+  onClick?: () => void;
+}
 interface Product {
   id: string;
   title: string;
@@ -991,7 +995,10 @@ const VU: FC<VUProps> = ({ side }) => {
     </div>
   );
 };
-
+interface CampaignKeywords {
+  shortTail: string[];
+  longTail: string[];
+}
 // ============================================================================
 // Main component
 // ============================================================================
@@ -1049,7 +1056,10 @@ const [longTailOpen, setLongTailOpen] = useState(false);
   const [generating, setGenerating] = useState<boolean>(false);
 const [campaignCollections, setCampaignCollections] = useState<string[]>([]);
 const [campaignProducts, setCampaignProducts] = useState<string[]>([]);
-const [campaignKeywords, setCampaignKeywords] = useState<string[]>([]);
+const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
+  shortTail: [],
+  longTail: [],
+});
   // --- Toast ---
   const [toastMsg, setToastMsg] = useState<string>("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1144,7 +1154,7 @@ const clickKnob = (e: MouseEvent<HTMLDivElement>, id: string): void => {
   setSelected(id);
 };
 
-const getFootSwitches = (selectedKnob: string) => {
+const getFootSwitches = (selectedKnob: string): FootSwitch[] => {
   switch (selectedKnob) {
     case "kFeedback":
       return [
@@ -1369,7 +1379,7 @@ return storeData.competitors.map((c) => ({
   const bulkAction = async (action: "draft" | "pub" | "sched"): Promise<void> => {
     for (const blog of blogs) {
       try {
-        const endpoint = action === "draft" ? ApiConfig.saveBlogDraft : ApiConfig.publishBlog;
+        const endpoint = action === "draft" ? ApiConfig.saveBlogDraft(blog.id) : ApiConfig.PUBLISH_BLOG(blog.id);
         await ApiService.post(endpoint, { blogId: blog.id, title: blog.title, html: blog.html });
         // update local status
         setBlogs((prev) =>

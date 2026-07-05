@@ -21,7 +21,7 @@ const ApiConfig = {
   COLLECTIONS: "/shopify/collections",
   getCountry:"country-events",
   getEvents:(country:string)=>`country-events/${country}`,
-
+  saveBlogDraft:(blogId:string)=>`/blog/${blogId}/draft`,
   // Future APIs...
 };
 
