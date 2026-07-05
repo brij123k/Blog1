@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 
 const styles = `
+@import url('https://fonts.googleapis.com/css2?family=Passion+One:wght@400;700;900&family=Poppins:wght@400;600;700&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -65,10 +67,12 @@ const styles = `
 }
 
 .only1-content h1 {
-  font-size: clamp(22px, 3.6vw, 42px);
-  line-height: 1.15;
-  font-weight: 800;
+  font-family: 'Passion One', sans-serif;
+  font-weight: 900;
+  font-size: clamp(30px, 4.6vw, 56px);
+  line-height: 1.05;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
   margin-bottom: 16px;
   color: #fff;
 }
@@ -92,16 +96,17 @@ const styles = `
   border: none;
   cursor: pointer;
   border-radius: 40px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Passion One', sans-serif;
+  text-transform: uppercase;
   color: #000;
   background: #00E8FF;
   transition: transform 0.3s;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
 }
 
 .btn-sweep .arrow {
@@ -186,12 +191,14 @@ const styles = `
 }
 
 .circle-card h2 {
-  font-size: clamp(16px, 1.5vw, 22px);
-  font-weight: 800;
+  font-family: 'Passion One', sans-serif;
+  font-weight: 900;
+  font-size: clamp(20px, 1.9vw, 28px);
   text-transform: uppercase;
   color: #fff;
   margin-bottom: 10px;
-  line-height: 1.2;
+  line-height: 1.15;
+  letter-spacing: 0.5px;
 }
 
 .circle-card h2 .num {
@@ -201,12 +208,13 @@ const styles = `
 }
 
 .circle-card .highlight {
-  font-size: clamp(13px, 1.1vw, 16px);
+  font-family: 'Passion One', sans-serif;
   font-weight: 700;
+  font-size: clamp(15px, 1.3vw, 19px);
   text-transform: uppercase;
   color: #E87EFF;
-  line-height: 1.4;
-  letter-spacing: 0.5px;
+  line-height: 1.3;
+  letter-spacing: 1px;
 }
 
 .btn-back {
@@ -234,7 +242,7 @@ const styles = `
 
 @media (max-width: 991px) {
   .only1-content { max-width: min(440px, 80vw); }
-  .only1-content h1 { font-size: clamp(20px, 4.2vw, 32px); }
+  .only1-content h1 { font-size: clamp(26px, 5.2vw, 42px); }
   .only1-content p { font-size: clamp(12px, 1.6vw, 15px); }
   .circles-row { gap: 30px; }
   .circle-card { width: 200px; height: 200px; }
@@ -242,13 +250,13 @@ const styles = `
 
 @media (max-width: 768px) {
   .only1-content { max-width: 85%; }
-  .only1-content h1 { font-size: clamp(18px, 5.5vw, 26px); }
+  .only1-content h1 { font-size: clamp(24px, 7vw, 34px); }
   .only1-content p { font-size: clamp(11px, 3vw, 14px); }
   .circles-row { flex-direction: column; gap: 20px; }
   .circles-wrapper { gap: 25px; }
   .circle-card { width: 170px; height: 170px; }
-  .circle-card h2 { font-size: 14px; }
-  .circle-card .highlight { font-size: 12px; }
+  .circle-card h2 { font-size: 18px; }
+  .circle-card .highlight { font-size: 15px; }
 }
 
 @media (max-width: 480px) {
