@@ -4277,7 +4277,7 @@ if (loading) {
   onClose={() => setMarketModalOpen(false)}
   onSave={(newMarkets) => {
     // Update store data with new markets
-    setStoreData((prev) => {
+    setStoreData((prev:any) => {
       if (!prev) return prev;
       return {
         ...prev,
