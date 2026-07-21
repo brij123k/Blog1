@@ -15,7 +15,7 @@ import RetailModal from "../../components/RetailModal";
 import ExperientialModal from "../../components/ExperientialModal";
 import ShortTailKeywordsModal from "../../components/ShortTailKeywordsModal";
 import LongTailKeywordsModal from "../../components/LongTailKeywordsModal";
-
+import MarketModal from "../../components/MarketModal";
 // ============================================================================
 // Types
 // ============================================================================
@@ -1698,9 +1698,6 @@ const KNOB_MODAL_MAP: Record<string, KnobModalType> = {
   kMod: null,
 };
 
-
-// Local storage key used to persist the topic -> product selection so the
-// "Product" step and the "Generator" step can be done in separate visits.
 const LS_KEY = "meris_lvx_topic_products_v1";
 // Local storage keys for the sidebar pages
 const GSC_LS_KEY = "meris_gsc_v1";
@@ -1747,16 +1744,6 @@ const TOUR_CONFIG: Record<
     bubble: { left: "5%", top: "44%" },
   },
 };
-
-// ============================================================================
-// Dashboard knob tour — one arrow + message per knob, shown in sequence
-// right on the pedal. Positions are in cqw (container units of the pedal)
-// so every hint scales responsively with the pedal.
-//   - Top-row knobs (Preview / Generator / Generate) get a DOWN arrow whose
-//     tip lands on the knob from above.
-//   - Bottom-row knobs (Store / Competitor / Calendar / Keywords) get an UP
-//     arrow sitting below the knob row, tip landing on the knob.
-// ============================================================================
 
 const KNOB_TOUR: Array<{
   key: string;
@@ -1888,15 +1875,6 @@ const VU: FC<VUProps> = ({ side }) => {
   );
 };
 
-// Animated hand-drawn arrow (motion/react): the line draws itself on,
-// the head fades in, and the whole arrow bobs gently.
-// Two path variants so the head is DRAWN pointing the right way — no
-// fragile rotate/flip guessing:
-//   "upRight"  -> head at the top-right end (used inside the portal tour)
-//   "downLeft" -> head at the bottom-left end (used on the dashboard, so
-//                 the tip lands straight on the preview knob)
-// size accepts a number (px) or any CSS width (e.g. "100%", "12cqw") so
-// the arrow can scale responsively with its container.
 interface GuideArrowProps {
   variant?: "upRight" | "downLeft" | "down" | "up";
   rotate?: number;
@@ -2005,7 +1983,9 @@ const MerisLVX: FC = () => {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selTopics, setSelTopics] = useState<Set<string>>(() => new Set());
   const [custom, setCustom] = useState<string>("");
-
+  const [marketModalOpen, setMarketModalOpen] = useState<boolean>(false);
+const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+const [loadingCountries, setLoadingCountries] = useState<boolean>(false);
   const [footDetail, setFootDetail] = useState<{
     type: "competitor" | "keyword";
     data: any; // competitor object or keyword array
@@ -2106,7 +2086,36 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(""), 2200);
   }, []);
-
+const fetchAvailableCountries = useCallback(async (): Promise<void> => {
+  setLoadingCountries(true);
+  try {
+    const response = await ApiService.get(ApiConfig.getCountry);
+    // Assuming the response is an array of country objects or strings
+    // Adjust based on your actual response structure
+    if (Array.isArray(response)) {
+      // If response is array of strings
+      if (typeof response[0] === 'string') {
+        setAvailableCountries(response);
+      } else if (response[0]?.name) {
+        // If response is array of objects with name property
+        setAvailableCountries(response.map((c: any) => c.name));
+      } else if (response[0]?.country) {
+        setAvailableCountries(response.map((c: any) => c.country));
+      } else {
+        setAvailableCountries([]);
+      }
+    } else if (response?.countries && Array.isArray(response.countries)) {
+      setAvailableCountries(response.countries);
+    } else {
+      setAvailableCountries([]);
+    }
+  } catch (err) {
+    console.error("Failed to fetch countries:", err);
+    toast("Failed to load country suggestions");
+  } finally {
+    setLoadingCountries(false);
+  }
+}, [toast]);
   // Load store analysis from the backend on mount.
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
@@ -2135,6 +2144,7 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
     fetchData();
   }, [toast]);
 
+  
   // Position the foot-row "beam" under the currently selected knob on mount.
   useEffect(() => {
     if (feedbackRef.current && footRef.current) {
@@ -3283,15 +3293,38 @@ if (loading) {
           <div className="side-title">
             <span className="sdot" /> Blog Studio
           </div>
-          {storeData && (
-            <div className="side-store">
-              <div className="ss-name">{storeData.shopDomain || "My store"}</div>
-              <div className="ss-meta">{(storeData.niche || "").slice(0, 48)}</div>
-              <div className="ss-meta">
-                Market: {storeData.primaryMarket || "—"} · Topics: {topics.length}
-              </div>
-            </div>
-          )}
+         {storeData && (
+  <div className="side-store">
+    <div className="ss-name">{storeData.shopDomain || "My store"}</div>
+    <div className="ss-meta">{(storeData.niche || "").slice(0, 48)}</div>
+    <div className="ss-meta" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <span>
+        Market: {Array.isArray(storeData.primaryMarket) 
+          ? storeData.primaryMarket.join(", ") 
+          : storeData.primaryMarket || "—"}
+      </span>
+      <button
+        type="button"
+        className="btn btn-gho btn-sm"
+        onClick={() => {
+          fetchAvailableCountries();
+          setMarketModalOpen(true);
+        }}
+        style={{ 
+          padding: "2px 10px", 
+          fontSize: "11px",
+          background: "rgba(110,162,255,0.1)",
+          border: "1px solid rgba(130,160,255,0.2)",
+          borderRadius: "6px",
+          color: "#9cc2ff",
+          cursor: "pointer"
+        }}
+      >
+        ✎ Edit
+      </button>
+    </div>
+  </div>
+)}
           <div
             className={"side-item" + (view === "pedal" ? " active" : "")}
             onClick={() => setView("pedal")}
@@ -3440,7 +3473,10 @@ if (loading) {
                   <div className="screen bv-screen">
                     {/* top corner meta (market left, language right) */}
                     <div className="scr-corner tl">
-                      {(storeData?.primaryMarket || "US").split("(")[0].trim()}
+                      {Array.isArray(storeData?.primaryMarket) 
+  ? storeData.primaryMarket.join(", ").split("(")[0].trim()
+  : (storeData?.primaryMarket || "US").split("(")[0].trim()
+}
                     </div>
                     <div className="scr-corner tr">
                       {storeData?.language || "EN"}
@@ -4234,6 +4270,32 @@ if (loading) {
 
       {/* Toast */}
       <div className={"toast" + (toastMsg ? " show" : "")}>{toastMsg}</div>
+
+      {/* Market Modal */}
+<MarketModal
+  isOpen={marketModalOpen}
+  onClose={() => setMarketModalOpen(false)}
+  onSave={(newMarkets) => {
+    // Update store data with new markets
+    setStoreData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        primaryMarket: newMarkets,
+      };
+    });
+    toast("Markets updated successfully!");
+  }}
+  currentMarkets={Array.isArray(storeData?.primaryMarket) 
+    ? storeData.primaryMarket 
+    : storeData?.primaryMarket 
+      ? [storeData.primaryMarket] 
+      : []
+  }
+  availableCountries={availableCountries}
+/>
+
+
     </>
   );
 };

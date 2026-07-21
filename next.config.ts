@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
 };
 module.exports = {
   allowedDevOrigins: [
-    "0bcc-111-223-30-55.ngrok-free.app",
+    "1029-2409-40e3-209f-324d-f9f4-b4c5-14bf-ea30.ngrok-free.app",
   ],
 };
 
