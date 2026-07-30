@@ -332,21 +332,7 @@ const pathnames = usePathname();
         </button>
 
         <div className="side-sec">SEO Tools</div>
-        <button
-          type="button"
-          className={"side-item" + (isActive("console") ? " active" : "")}
-          onClick={() => go("console")}
-        >
-          🔍 Google Console {gscConnected && <span className="cnt">✓</span>}
-        </button>
-        <button
-          type="button"
-          className={"side-item" + (isActive("backlinks") ? " active" : "")}
-          onClick={() => go("backlinks")}
-        >
-          🔗 Backlinks <span className="cnt">{backlinkCount}</span>
-        </button>
-
+        
         <div className="side-sec">Account</div>
         <button
           type="button"
