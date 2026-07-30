@@ -8,9 +8,10 @@ const ApiConfig = {
   analyzeStore: "/store-intelligence/analyze",
   USER_DETAILS: (id: string) => `/users/${id}`,
   UPDATE_USER: (id: string) => `/users/${id}`,
-
+  UPDATETOPICS:`/store-intelligence/topics/generate`,
   // Blog
   BLOGS: "/blog",
+  ALLBLOGS: "/blog/all",
   BLOG_DETAILS: (id: string) => `/blog/${id}`,
   CREATE_BLOG: "/blog/generate",
   GENERATE_BLOGCAMPAIGN: "/blog/generate-campaign",
@@ -23,7 +24,10 @@ const ApiConfig = {
   addCountry:"/store-intelligence/primary-market",
   getEvents:(country:string)=>`country-events/${country}`,
   saveBlogDraft:(blogId:string)=>`/blog/${blogId}/draft`,
-  // Future APIs...
+  
+
+  getActivePlans:"/plans",
+  userPlan:"/user-subscription/me",
 };
 
 export default ApiConfig;

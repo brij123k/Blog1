@@ -1,7 +1,7 @@
 import { storage } from "./storage";
 
-// const API = "http://localhost:5000";
-const API = "https://hammerhead-app-7hn5u.ondigitalocean.app";
+// export  const API = "http://localhost:5000";
+export const API = "https://hammerhead-app-7hn5u.ondigitalocean.app";
 
 export async function api(
   endpoint: string,

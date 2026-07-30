@@ -35,3 +35,191 @@ body {
 /* ── Base reset ── */
 html { scroll-behavior: smooth; }
 body { background: #020b18; color: #e2e8f0; overflow-x: hidden; }
+/* In your globals.css or navbar.module.css */
+
+.app-shell {
+  padding-top: 72px; /* Adjust according to your navbar height */
+}
+
+
+
+/* bilings */
+/* Popular card animation */
+.popular-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6ea2ff, #3b73ff);
+}
+
+/* Custom scrollbar for the page */
+.billing-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.billing-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.billing-container::-webkit-scrollbar-thumb {
+  background: rgba(130, 160, 255, 0.25);
+  border-radius: 6px;
+}
+
+.billing-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(130, 160, 255, 0.4);
+}
+
+/* Ensure cards are properly centered when less than max */
+@media (min-width: 1280px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Fix for mobile */
+@media (max-width: 640px) {
+  .grid-cols-1 {
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Smooth transitions */
+.plan-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 0.7s linear infinite;
+}
+
+
+/* content page  */
+.ql-toolbar.ql-snow {
+  border-color: rgba(130, 160, 255, 0.2) !important;
+  background: #1b2138 !important;
+}
+
+.ql-container.ql-snow {
+  border-color: rgba(130, 160, 255, 0.2) !important;
+  background: #0a0e1c !important;
+}
+
+.ql-editor {
+  color: #eef2ff !important;
+  font-size: 14px !important;
+  line-height: 1.8 !important;
+  min-height: 300px !important;
+}
+
+.ql-editor h1 {
+  font-size: 2rem !important;
+  color: #eef2ff !important;
+  margin: 1.5rem 0 0.5rem !important;
+}
+
+.ql-editor h2 {
+  font-size: 1.5rem !important;
+  color: #eef2ff !important;
+  margin: 1.25rem 0 0.5rem !important;
+}
+
+.ql-editor h3 {
+  font-size: 1.25rem !important;
+  color: #eef2ff !important;
+  margin: 1rem 0 0.5rem !important;
+}
+
+.ql-editor p {
+  margin-bottom: 0.75rem !important;
+  color: #dbe4fb !important;
+}
+
+.ql-editor ul, .ql-editor ol {
+  padding-left: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.ql-editor li {
+  color: #dbe4fb !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.ql-editor a {
+  color: #6ea2ff !important;
+  text-decoration: underline !important;
+}
+
+.ql-editor blockquote {
+  border-left: 3px solid rgba(130, 160, 255, 0.3) !important;
+  padding-left: 1rem !important;
+  margin: 0.75rem 0 !important;
+  color: #8ea0cc !important;
+}
+
+.ql-editor code {
+  background: rgba(130, 160, 255, 0.1) !important;
+  padding: 0.15rem 0.4rem !important;
+  border-radius: 4px !important;
+  color: #9cc2ff !important;
+}
+
+.ql-editor pre {
+  background: rgba(0, 0, 0, 0.4) !important;
+  padding: 1rem !important;
+  border-radius: 8px !important;
+  overflow-x: auto !important;
+}
+
+.ql-toolbar button {
+  color: #8ea0cc !important;
+}
+
+.ql-toolbar button:hover {
+  color: #eef2ff !important;
+}
+
+.ql-toolbar .ql-picker-label {
+  color: #8ea0cc !important;
+}
+
+.ql-toolbar .ql-picker-options {
+  background: #1b2138 !important;
+  border-color: rgba(130, 160, 255, 0.2) !important;
+}
+
+.ql-toolbar .ql-picker-item:hover {
+  color: #eef2ff !important;
+}
+
+.ql-toolbar .ql-active {
+  color: #6ea2ff !important;
+}
+
+.ql-toolbar .ql-stroke {
+  stroke: #8ea0cc !important;
+}
+
+.ql-toolbar .ql-fill {
+  fill: #8ea0cc !important;
+}
+
+.ql-toolbar .ql-active .ql-stroke {
+  stroke: #6ea2ff !important;
+}
+
+.ql-toolbar .ql-active .ql-fill {
+  fill: #6ea2ff !important;
+}

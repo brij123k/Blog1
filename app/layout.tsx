@@ -1,5 +1,6 @@
 import "./globals.css";
 import AuthProvider from "./providers/AuthProvider";
+import Navbar from "../app/components/Navbar";
 
 export default function RootLayout({
   children,
@@ -7,10 +8,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html>
+    <html lang="en">
       <body>
         <AuthProvider>
-          {children}
+          {/* <Navbar /> */}
+          <div className="app-shell">
+            {children}
+          </div>
         </AuthProvider>
       </body>
     </html>

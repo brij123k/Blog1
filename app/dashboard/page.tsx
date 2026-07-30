@@ -15,11 +15,15 @@ import RetailModal from "../../components/RetailModal";
 import ExperientialModal from "../../components/ExperientialModal";
 import ShortTailKeywordsModal from "../../components/ShortTailKeywordsModal";
 import LongTailKeywordsModal from "../../components/LongTailKeywordsModal";
-import MarketModal from "../../components/MarketModal";
 // ============================================================================
 // Types
 // ============================================================================
-
+import {API} from "../lib/api"
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+// Shared, app-wide store cache. The Navbar and this dashboard read the SAME
+// data, so the analyze endpoint is only ever called once per session.
+import { useAppStore, loadStoreData, publishBlogs } from "../lib/appStore";
 interface StoreData {
   _id: string;
   integrationId: string;
@@ -954,39 +958,14 @@ const CSS = `
   position: relative;
 }
 
-/* ===== App sidebar & pages ===== */
-.lvx-root { padding-left: 290px; }
-/* Sidebar is FIXED: it floats on the left and never pushes or resizes
-   the pedal / dashboard content. */
-.app-side { position: fixed; left: 20px; top: 80px; bottom: 20px; width: 240px;
-  overflow-y: auto; z-index: 500;
-  background: linear-gradient(180deg,#1b2136,#10141f); border:1px solid rgba(130,160,255,.18);
-  border-radius: 18px; padding: 18px 12px; color:#dbe4fb; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
-.app-side::-webkit-scrollbar { width: 6px; }
-.app-side::-webkit-scrollbar-thumb { background: rgba(130,160,255,.25); border-radius: 6px; }
+/* ===== App pages =====
+   NOTE: all sidebar / navbar styling now lives in components/Navbar.tsx so
+   that the nav renders identically on every page. The left offset is applied
+   by the .app-shell wrapper in app/layout.tsx. */
+.lvx-root { padding-left: 0; }
 @media (max-width: 980px) {
-  .lvx-root { padding-left: 20px; }
-  .app-side { position: static; width: 100%; margin-bottom: 20px; bottom: auto; }
   .lvx-root { flex-direction: column; }
 }
-.side-store { margin: 0 8px 12px; padding: 10px 12px; border:1px solid rgba(130,160,255,.2);
-  border-radius: 12px; background: rgba(10,14,28,.55); }
-.side-store .ss-name { font-size: 13px; font-weight: 600; color:#eef2ff; margin-bottom: 3px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.side-store .ss-meta { font-size: 11.5px; color:#8ea0cc; line-height: 1.5; }
-.app-side .side-title { font-size:15px; font-weight:600; letter-spacing:.5px; color:#eef2ff;
-  padding: 4px 10px 14px; display:flex; align-items:center; gap:9px; }
-.app-side .side-title .sdot { width:10px; height:10px; border-radius:50%;
-  background:radial-gradient(circle at 40% 35%, #eaf2ff, #6294ec 46%, #21478e 100%);
-  box-shadow:0 0 12px rgba(98,148,236,.9); }
-.side-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px;
-  cursor:pointer; font-size:14px; color:#b9c6ea; transition:.15s; border:1px solid transparent; user-select:none; }
-.side-item:hover { background:rgba(110,162,255,.08); color:#eef2ff; }
-.side-item.active { background:linear-gradient(180deg,rgba(110,162,255,.22),rgba(59,115,255,.18));
-  border-color:rgba(130,160,255,.35); color:#fff; }
-.side-item .cnt { margin-left:auto; font-size:11px; background:rgba(40,52,86,.9);
-  border:1px solid rgba(130,160,255,.25); border-radius:999px; padding:1px 8px; color:#9fb0d8; }
-.side-sec { margin:14px 10px 6px; font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:#7386b3; }
 .app-main { flex:1; min-width:0; display:flex; justify-content:center; }
 .page { width:min(1000px,100%); background:rgba(18,24,44,.92); border:1px solid rgba(130,160,255,.18);
   border-radius:18px; padding:26px 28px; color:#e7ecfb; box-shadow:0 20px 60px rgba(0,0,0,.45); animation:pop .25s ease; }
@@ -1468,12 +1447,6 @@ body {
 /* Brand mark */
 .brand { font-size: clamp(11px, 1.6vw, 16px); }
 
-/* Sidebar content slightly larger too */
-.side-item { font-size: 15px; }
-.side-store .ss-name { font-size: 14px; }
-.side-store .ss-meta { font-size: 12.5px; }
-.side-sec { font-size: 11.5px; }
-.app-side .side-title { font-size: 16px; }
 
 /* ==========================================================================
    "NEW TITLES" — prompt box + first-time arrow hint
@@ -1967,7 +1940,7 @@ interface CampaignKeywords {
 // Main component
 // ============================================================================
 
-const MerisLVX: FC = () => {
+const DashboardInner: FC = () => {
   // --- Panel / knob UI state ---
   const [selected, setSelected] = useState<string>("kFeedback");
   const [ox, setOx] = useState<string>("10%");
@@ -1983,9 +1956,6 @@ const MerisLVX: FC = () => {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selTopics, setSelTopics] = useState<Set<string>>(() => new Set());
   const [custom, setCustom] = useState<string>("");
-  const [marketModalOpen, setMarketModalOpen] = useState<boolean>(false);
-const [availableCountries, setAvailableCountries] = useState<string[]>([]);
-const [loadingCountries, setLoadingCountries] = useState<boolean>(false);
   const [footDetail, setFootDetail] = useState<{
     type: "competitor" | "keyword";
     data: any; // competitor object or keyword array
@@ -2044,6 +2014,11 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
   // --- Sidebar / pages state ---
   const [view, setView] = useState<AppView>("pedal");
   const [blogTab, setBlogTab] = useState<"all" | "draft" | "sched" | "pub">("all");
+  // The global Navbar drives the current view through the URL, e.g.
+  //   /dashboard?view=blogs&tab=draft
+  const searchParams = useSearchParams();
+  const urlView = searchParams.get("view");
+  const urlTab = searchParams.get("tab");
   const [allBlogs, setAllBlogs] = useState<Blog[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState<boolean>(false);
   const [schedFor, setSchedFor] = useState<string | null>(null);
@@ -2086,65 +2061,46 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(""), 2200);
   }, []);
-const fetchAvailableCountries = useCallback(async (): Promise<void> => {
-  setLoadingCountries(true);
-  try {
-    const response = await ApiService.get(ApiConfig.getCountry);
-    // Assuming the response is an array of country objects or strings
-    // Adjust based on your actual response structure
-    if (Array.isArray(response)) {
-      // If response is array of strings
-      if (typeof response[0] === 'string') {
-        setAvailableCountries(response);
-      } else if (response[0]?.name) {
-        // If response is array of objects with name property
-        setAvailableCountries(response.map((c: any) => c.name));
-      } else if (response[0]?.country) {
-        setAvailableCountries(response.map((c: any) => c.country));
-      } else {
-        setAvailableCountries([]);
-      }
-    } else if (response?.countries && Array.isArray(response.countries)) {
-      setAvailableCountries(response.countries);
-    } else {
-      setAvailableCountries([]);
-    }
-  } catch (err) {
-    console.error("Failed to fetch countries:", err);
-    toast("Failed to load country suggestions");
-  } finally {
-    setLoadingCountries(false);
-  }
-}, [toast]);
-  // Load store analysis from the backend on mount.
+  // ==========================================================================
+  // Store analysis (shared with the global Navbar via app/lib/appStore.tsx)
+  // ==========================================================================
+  const { storeData: sharedStore, loadedStore } = useAppStore();
+  const topicsSeeded = useRef<boolean>(false);
+
   useEffect(() => {
-    const fetchData = async (): Promise<void> => {
-      try {
-        const response = await ApiService.post(ApiConfig.analyzeStore);
-        setStoreData(response);
-        if (response?.blogTopics) {
-          const loadedTopics: Topic[] = response.blogTopics.map((bt: StoreData["blogTopics"][number]) => ({
-            id: uid(),
-            name: bt.title,
-            keyword: bt.keyword,
-            intent: bt.intent,
-            difficulty: bt.difficulty,
-            priority: bt.priority,
-          }));
-          setTopics(loadedTopics);
-          setSelTopics(new Set(loadedTopics.map((t) => t.id)));
-        }
-      } catch (err) {
-        console.error("Failed to fetch store data:", err);
-        toast("Error loading store data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    loadStoreData().catch((err: unknown) => {
+      console.error("Failed to fetch store data:", err);
+      toast("Error loading store data");
+    });
   }, [toast]);
 
-  
+  // Mirror the shared store into local state so the rest of this file keeps
+  // working untouched. Topics are seeded only once, so a market edit made in
+  // the navbar never wipes the user's topic selection.
+  useEffect(() => {
+    if (!sharedStore) return;
+    setStoreData(sharedStore);
+    if (!topicsSeeded.current && sharedStore.blogTopics) {
+      topicsSeeded.current = true;
+      const loadedTopics: Topic[] = sharedStore.blogTopics.map(
+        (bt: StoreData["blogTopics"][number]) => ({
+          id: uid(),
+          name: bt.title,
+          keyword: bt.keyword,
+          intent: bt.intent,
+          difficulty: bt.difficulty,
+          priority: bt.priority,
+        })
+      );
+      setTopics(loadedTopics);
+      setSelTopics(new Set(loadedTopics.map((t) => t.id)));
+    }
+  }, [sharedStore]);
+
+  useEffect(() => {
+    setLoading(!loadedStore);
+  }, [loadedStore]);
+
   // Position the foot-row "beam" under the currently selected knob on mount.
   useEffect(() => {
     if (feedbackRef.current && footRef.current) {
@@ -2549,11 +2505,8 @@ return storeData.competitors.map((c) => ({
         });
         const blogData = res?.blog || res;
         let heroImg = blogData.heroImage?.url;
-        // if (heroImg && heroImg.startsWith('/')) {
-        //   heroImg = "http://localhost:5000" + heroImg;
-        // }
         if (heroImg && heroImg.startsWith('/')) {
-          heroImg = "https://hammerhead-app-7hn5u.ondigitalocean.app" + heroImg;
+          heroImg = API + heroImg;
         }
         console.log(`Generated blog for topic "${heroImg}":`, blogData);
         if (blogData) {
@@ -2596,6 +2549,23 @@ return storeData.competitors.map((c) => ({
   // ==========================================================================
   // Sidebar pages: Content Hub / Google Console / Backlinks
   // ==========================================================================
+
+  // Sync the view with whatever the navbar put in the URL.
+  useEffect(() => {
+    if (
+      urlView === "pedal" ||
+      urlView === "blogs" ||
+      urlView === "console" ||
+      urlView === "backlinks"
+    ) {
+      setView(urlView);
+    } else if (!urlView) {
+      setView("pedal");
+    }
+    if (urlTab === "all" || urlTab === "draft" || urlTab === "sched" || urlTab === "pub") {
+      setBlogTab(urlTab);
+    }
+  }, [urlView, urlTab]);
 
   // Load all blogs for the Content Hub. Uses a LIST endpoint if your
   // ApiConfig defines one (LIST_BLOGS / GET_BLOGS / BLOGS); otherwise falls
@@ -2642,6 +2612,12 @@ return storeData.competitors.map((c) => ({
   useEffect(() => {
     if (!loading) loadAllBlogs();
   }, [loading, loadAllBlogs]);
+
+  // Push the blog list up to the shared store so the global navbar counters
+  // (Content Hub / Draft / Scheduled / Published) stay live.
+  useEffect(() => {
+    publishBlogs(allBlogs);
+  }, [allBlogs]);
 
   // Restore Google Console connection + backlinks from local storage on mount.
   useEffect(() => {
@@ -2887,11 +2863,8 @@ return storeData.competitors.map((c) => ({
     const blogData = res?.blog || res; // adjust depending on actual response shape
 
     let heroImg = blogData.heroImage?.url;
-    // if (heroImg && heroImg.startsWith('/')) {
-    //   heroImg = "http://localhost:5000" + heroImg;
-    // }
     if (heroImg && heroImg.startsWith('/')) {
-      heroImg = "https://hammerhead-app-7hn5u.ondigitalocean.app" + heroImg;
+      heroImg = API + heroImg;
     }
     
 
@@ -3288,100 +3261,8 @@ if (loading) {
     <>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="lvx-root">
-        {/* ===== Sidebar navigation ===== */}
-        <aside className="app-side">
-          <div className="side-title">
-            <span className="sdot" /> Blog Studio
-          </div>
-         {storeData && (
-  <div className="side-store">
-    <div className="ss-name">{storeData.shopDomain || "My store"}</div>
-    <div className="ss-meta">{(storeData.niche || "").slice(0, 48)}</div>
-    <div className="ss-meta" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span>
-        Market: {Array.isArray(storeData.primaryMarket) 
-          ? storeData.primaryMarket.join(", ") 
-          : storeData.primaryMarket || "—"}
-      </span>
-      <button
-        type="button"
-        className="btn btn-gho btn-sm"
-        onClick={() => {
-          fetchAvailableCountries();
-          setMarketModalOpen(true);
-        }}
-        style={{ 
-          padding: "2px 10px", 
-          fontSize: "11px",
-          background: "rgba(110,162,255,0.1)",
-          border: "1px solid rgba(130,160,255,0.2)",
-          borderRadius: "6px",
-          color: "#9cc2ff",
-          cursor: "pointer"
-        }}
-      >
-        ✎ Edit
-      </button>
-    </div>
-  </div>
-)}
-          <div
-            className={"side-item" + (view === "pedal" ? " active" : "")}
-            onClick={() => setView("pedal")}
-          >
-            🎛️ Dashboard
-          </div>
-          <div className="side-sec">Content</div>
-          <div
-            className={"side-item" + (view === "blogs" && blogTab === "all" ? " active" : "")}
-            onClick={() => {
-              setView("blogs");
-              setBlogTab("all");
-            }}
-          >
-            📝 Content Hub <span className="cnt">{allBlogs.length}</span>
-          </div>
-          <div
-            className={"side-item" + (view === "blogs" && blogTab === "draft" ? " active" : "")}
-            onClick={() => {
-              setView("blogs");
-              setBlogTab("draft");
-            }}
-          >
-            Draft blogs <span className="cnt">{allBlogs.filter((b) => b.status === "draft").length}</span>
-          </div>
-          <div
-            className={"side-item" + (view === "blogs" && blogTab === "sched" ? " active" : "")}
-            onClick={() => {
-              setView("blogs");
-              setBlogTab("sched");
-            }}
-          >
-            Scheduled blogs <span className="cnt">{allBlogs.filter((b) => b.status === "sched").length}</span>
-          </div>
-          <div
-            className={"side-item" + (view === "blogs" && blogTab === "pub" ? " active" : "")}
-            onClick={() => {
-              setView("blogs");
-              setBlogTab("pub");
-            }}
-          >
-            Published blogs <span className="cnt">{allBlogs.filter((b) => b.status === "pub").length}</span>
-          </div>
-          <div className="side-sec">SEO Tools</div>
-          <div
-            className={"side-item" + (view === "console" ? " active" : "")}
-            onClick={() => setView("console")}
-          >
-            🔍 Google Console {gscConnected && <span className="cnt">✓</span>}
-          </div>
-          <div
-            className={"side-item" + (view === "backlinks" ? " active" : "")}
-            onClick={() => setView("backlinks")}
-          >
-            🔗 Backlinks <span className="cnt">{backlinks.length}</span>
-          </div>
-        </aside>
+        {/* Sidebar navigation now lives in components/Navbar.tsx and is
+            rendered globally from app/layout.tsx. */}
 
         {/* ===== Main area: pedal dashboard or a sidebar page ===== */}
         <div className="app-main">
@@ -4271,33 +4152,17 @@ if (loading) {
       {/* Toast */}
       <div className={"toast" + (toastMsg ? " show" : "")}>{toastMsg}</div>
 
-      {/* Market Modal */}
-<MarketModal
-  isOpen={marketModalOpen}
-  onClose={() => setMarketModalOpen(false)}
-  onSave={(newMarkets) => {
-    // Update store data with new markets
-    setStoreData((prev:any) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        primaryMarket: newMarkets,
-      };
-    });
-    toast("Markets updated successfully!");
-  }}
-  currentMarkets={Array.isArray(storeData?.primaryMarket) 
-    ? storeData.primaryMarket 
-    : storeData?.primaryMarket 
-      ? [storeData.primaryMarket] 
-      : []
-  }
-  availableCountries={availableCountries}
-/>
-
+      {/* Market editing now lives in the global navbar (components/Navbar.tsx) */}
 
     </>
   );
 };
+
+// useSearchParams() needs a Suspense boundary during prerender.
+const MerisLVX: FC = () => (
+  <Suspense fallback={null}>
+    <DashboardInner />
+  </Suspense>
+);
 
 export default MerisLVX;
