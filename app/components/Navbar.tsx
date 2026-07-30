@@ -18,7 +18,7 @@ import {
   loadBlogs,
   updateStoreData,
 } from "../lib/appStore";
-// import MarketModal from "./MarketModal";
+import MarketModal from "./MarketModal";
 
 // ---------------------------------------------------------------------------
 // Config — change these two if your routes are named differently
@@ -358,7 +358,7 @@ const pathnames = usePathname();
       </aside>
 
       {/* ===== Market modal (primary market editing) ===== */}
-      {/* <MarketModal
+      <MarketModal
         isOpen={marketModalOpen}
         onClose={() => setMarketModalOpen(false)}
         onSave={handleMarketSave}
@@ -370,7 +370,7 @@ const pathnames = usePathname();
             : []
         }
         availableCountries={availableCountries}
-      /> */}
+      />
 
       <div className={"nv-toast" + (toastMsg ? " show" : "")}>{toastMsg}</div>
     </>
