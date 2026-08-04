@@ -38,6 +38,13 @@ export const storage = {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 
+
+  setUserPlan(plan: any) {
+    localStorage.setItem('userPlan', JSON.stringify(plan));
+  },
+  getUserPlan(plan: any) {
+    localStorage.getItem('userPlan');
+  },
   logout() {
     if (typeof window === "undefined") return;
 

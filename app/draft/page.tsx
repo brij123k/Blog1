@@ -1,4 +1,4 @@
-// app/blogs/page.tsx
+// app/drafts/page.tsx
 "use client";
 
 import React, { useState, useEffect, FC, useCallback } from "react";
@@ -19,7 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  PenTool
 } from "lucide-react";
 import toast, { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
@@ -78,7 +79,7 @@ interface Pagination {
   hasPrev: boolean;
 }
 
-const BlogsPage: FC = () => {
+const DraftsPage: FC = () => {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState<Pagination>({
@@ -92,7 +93,6 @@ const BlogsPage: FC = () => {
   
   // Filters
   const [search, setSearch] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
   
@@ -131,13 +131,16 @@ const BlogsPage: FC = () => {
     'link', 'image', 'video'
   ];
 
-  // Fetch blogs
-  const fetchBlogs = useCallback(async () => {
+  // Fetch draft blogs (status: COMPLETED)
+  const fetchDrafts = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = { page, limit };
+      const params: any = { 
+        page, 
+        limit,
+        status: 'COMPLETED' // Default filter for drafts
+      };
       if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
       
       const response = await ApiService.get(ApiConfig.ALLBLOGS, params);
       setBlogs(response.data || []);
@@ -150,16 +153,16 @@ const BlogsPage: FC = () => {
         hasPrev: false,
       });
     } catch (error) {
-      console.error("Failed to fetch blogs:", error);
-      toast.error("Failed to load blogs. Please try again.");
+      console.error("Failed to fetch drafts:", error);
+      toast.error("Failed to load drafts. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, statusFilter]);
+  }, [page, limit, search]);
 
   useEffect(() => {
-    fetchBlogs();
-  }, [fetchBlogs]);
+    fetchDrafts();
+  }, [fetchDrafts]);
 
   // Handle save as draft
   const handleSaveAsDraft = async (blogId: string) => {
@@ -176,7 +179,7 @@ const BlogsPage: FC = () => {
         content: editContent,
       });
       toast.success("Blog saved as draft!");
-      await fetchBlogs();
+      await fetchDrafts();
       setShowEditModal(false);
     } catch (error) {
       console.error("Failed to save draft:", error);
@@ -201,7 +204,7 @@ const BlogsPage: FC = () => {
         content: editContent,
       });
       toast.success("Blog published successfully! 🎉");
-      await fetchBlogs();
+      await fetchDrafts();
       setShowEditModal(false);
     } catch (error) {
       console.error("Failed to publish:", error);
@@ -232,7 +235,7 @@ const BlogsPage: FC = () => {
         scheduledAt: new Date(scheduleDate).toISOString(),
       });
       toast.success("Blog scheduled successfully! 📅");
-      await fetchBlogs();
+      await fetchDrafts();
       setShowEditModal(false);
       setShowSchedulePicker(false);
     } catch (error) {
@@ -264,25 +267,9 @@ const BlogsPage: FC = () => {
     });
   };
 
-  // Get status badge color
-  const getStatusBadge = (status: string, publishStatus?: string) => {
-    if (publishStatus === 'PUBLISHED') {
-      return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-    }
-    if (publishStatus === 'FAILED') {
-      return 'bg-red-500/20 text-red-400 border border-red-500/30';
-    }
-    if (status === 'IMAGE_PENDING' || status === 'COMPLETED') {
-      return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
-    }
-    return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
-  };
-
-  const getStatusLabel = (status: string, publishStatus?: string) => {
-    if (publishStatus === 'PUBLISHED') return 'Published';
-    if (publishStatus === 'FAILED') return 'Failed';
-    if (status === 'IMAGE_PENDING' || status === 'COMPLETED') return 'Draft';
-    return status || 'Draft';
+  // Get status badge
+  const getStatusBadge = () => {
+    return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
   };
 
   // Pagination controls
@@ -339,11 +326,14 @@ const BlogsPage: FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-white mb-1">
-            📝 Blog Management
-          </h1>
+          <div className="flex items-center gap-3 mb-1">
+            <PenTool size={28} className="text-yellow-400" />
+            <h1 className="text-2xl sm:text-3xl font-semibold text-white">
+              Draft Blogs
+            </h1>
+          </div>
           <p className="text-slate-400 text-sm">
-            Manage all your blogs - edit, publish, schedule, or save as draft
+            Manage your draft blogs - edit, publish, schedule, or continue writing
           </p>
         </div>
         <button
@@ -355,28 +345,18 @@ const BlogsPage: FC = () => {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Search & Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1 relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search blogs by title or topic..."
+            placeholder="Search draft blogs by title or topic..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#1b2138]/80 border border-blue-500/20 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 transition-colors"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-[#1b2138]/80 border border-blue-500/20 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
-        >
-          <option value="">All Status</option>
-          <option value="COMPLETED">Draft</option>
-          <option value="PUBLISHED">Published</option>
-          <option value="FAILED">Failed</option>
-        </select>
         <select
           value={limit}
           onChange={(e) => setLimit(Number(e.target.value))}
@@ -389,17 +369,17 @@ const BlogsPage: FC = () => {
         </select>
       </div>
 
-      {/* Blog List */}
+      {/* Draft List */}
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400">
           <div className="w-10 h-10 border-3 border-blue-500/15 border-t-blue-400 rounded-full animate-spin mb-4"></div>
-          <p>Loading blogs...</p>
+          <p>Loading drafts...</p>
         </div>
       ) : blogs.length === 0 ? (
         <div className="text-center py-16 text-slate-400 bg-[#1b2138]/50 rounded-xl border border-blue-500/10">
           <FileText size={48} className="mx-auto mb-4 text-slate-500" />
-          <h3 className="text-white text-xl mb-2">No blogs found</h3>
-          <p>Try adjusting your search or filters</p>
+          <h3 className="text-white text-xl mb-2">No drafts found</h3>
+          <p>All your draft blogs will appear here. Start writing!</p>
         </div>
       ) : (
         <>
@@ -411,23 +391,23 @@ const BlogsPage: FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="bg-gradient-to-b from-[#1b2138]/95 to-[#0f1321]/95 border border-blue-500/20 rounded-xl p-4 sm:p-6 hover:border-blue-500/40 transition-all"
+                  className="bg-gradient-to-b from-[#1b2138]/95 to-[#0f1321]/95 border border-yellow-500/20 rounded-xl p-4 sm:p-6 hover:border-yellow-500/40 transition-all"
                 >
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(blog.status, blog.publishStatus)}`}>
-                          {getStatusLabel(blog.status, blog.publishStatus)}
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge()}`}>
+                          Draft
                         </span>
-                        {blog.publishStatus === 'PUBLISHED' && blog.publishedAt && (
-                          <span className="text-xs text-slate-400 flex items-center gap-1">
-                            <Clock size={12} />
-                            {formatDate(blog.publishedAt)}
-                          </span>
-                        )}
                         {blog.isScheduled && (
                           <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
                             Scheduled
+                          </span>
+                        )}
+                        {blog.updatedAt && (
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
+                            <Clock size={12} />
+                            Updated: {formatDate(blog.updatedAt)}
                           </span>
                         )}
                       </div>
@@ -443,7 +423,7 @@ const BlogsPage: FC = () => {
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
-                          {formatDate(blog.createdAt)}
+                          Created: {formatDate(blog.createdAt)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
@@ -462,10 +442,10 @@ const BlogsPage: FC = () => {
                     <div className="flex flex-wrap gap-2 flex-shrink-0">
                       <button
                         onClick={() => openEditModal(blog)}
-                        className="px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors text-sm inline-flex items-center gap-1.5"
+                        className="px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors text-sm inline-flex items-center gap-1.5"
                       >
                         <Edit size={15} />
-                        Edit
+                        Edit Draft
                       </button>
                       {blog.shopifyUrl && (
                         <a
@@ -487,11 +467,11 @@ const BlogsPage: FC = () => {
 
           {/* Enhanced Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-[#1b2138]/50 rounded-xl border border-blue-500/10">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-[#1b2138]/50 rounded-xl border border-yellow-500/10">
               <div className="text-sm text-slate-400">
                 Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
                 {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                {pagination.total} blogs
+                {pagination.total} drafts
               </div>
               
               <div className="flex items-center gap-1 flex-wrap justify-center">
@@ -499,7 +479,7 @@ const BlogsPage: FC = () => {
                 <button
                   onClick={() => goToPage(1)}
                   disabled={!pagination.hasPrev}
-                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-blue-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
+                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-yellow-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
                   title="First page"
                 >
                   <ChevronsLeft size={16} />
@@ -509,7 +489,7 @@ const BlogsPage: FC = () => {
                 <button
                   onClick={() => goToPage(pagination.page - 1)}
                   disabled={!pagination.hasPrev}
-                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-blue-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
+                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-yellow-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
                   title="Previous page"
                 >
                   <ChevronLeft size={16} />
@@ -523,10 +503,10 @@ const BlogsPage: FC = () => {
                       onClick={() => typeof item === 'number' && goToPage(item)}
                       className={`min-w-[36px] h-9 px-2 rounded-lg text-sm font-medium transition-colors ${
                         item === pagination.page
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                           : item === '...'
                           ? 'text-slate-500 cursor-default'
-                          : 'bg-[#1b2138]/80 text-white hover:bg-[#1b2138] border border-blue-500/10'
+                          : 'bg-[#1b2138]/80 text-white hover:bg-[#1b2138] border border-yellow-500/10'
                       }`}
                       disabled={item === '...'}
                     >
@@ -539,7 +519,7 @@ const BlogsPage: FC = () => {
                 <button
                   onClick={() => goToPage(pagination.page + 1)}
                   disabled={!pagination.hasNext}
-                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-blue-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
+                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-yellow-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
                   title="Next page"
                 >
                   <ChevronRight size={16} />
@@ -549,7 +529,7 @@ const BlogsPage: FC = () => {
                 <button
                   onClick={() => goToPage(pagination.totalPages)}
                   disabled={!pagination.hasNext}
-                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-blue-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
+                  className="p-2 rounded-lg bg-[#1b2138]/80 border border-yellow-500/20 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1b2138] transition-colors"
                   title="Last page"
                 >
                   <ChevronsRight size={16} />
@@ -563,12 +543,12 @@ const BlogsPage: FC = () => {
       {/* Edit Modal */}
       {showEditModal && editingBlog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-gradient-to-b from-[#1b2138] to-[#0f1321] border border-blue-500/20 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-gradient-to-b from-[#1b2138] to-[#0f1321] border border-yellow-500/20 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-blue-500/10">
+            <div className="flex items-center justify-between p-4 border-b border-yellow-500/10">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Edit size={20} className="text-blue-400" />
-                Edit Blog
+                <Edit size={20} className="text-yellow-400" />
+                Edit Draft
               </h2>
               <button
                 onClick={() => {
@@ -592,7 +572,7 @@ const BlogsPage: FC = () => {
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-blue-500/20 text-white focus:outline-none focus:border-blue-500/50 transition-colors placeholder-slate-500"
+                  className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-yellow-500/20 text-white focus:outline-none focus:border-yellow-500/50 transition-colors placeholder-slate-500"
                   placeholder="Blog title..."
                 />
               </div>
@@ -602,14 +582,14 @@ const BlogsPage: FC = () => {
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Content (Rich Text)
                 </label>
-                <div className="bg-[#0a0e1c]/80 rounded-lg border border-blue-500/20 overflow-hidden">
+                <div className="bg-[#0a0e1c]/80 rounded-lg border border-yellow-500/20 overflow-hidden">
                   <ReactQuill
                     theme="snow"
                     value={editContent}
                     onChange={setEditContent}
                     modules={quillModules}
                     formats={quillFormats}
-                    className="text-white min-h-[300px] [&_.ql-editor]:min-h-[300px] [&_.ql-editor]:text-white [&_.ql-toolbar]:bg-[#1b2138] [&_.ql-toolbar]:border-blue-500/20 [&_.ql-container]:border-blue-500/20 [&_.ql-editor]:bg-[#0a0e1c]"
+                    className="text-white min-h-[300px] [&_.ql-editor]:min-h-[300px] [&_.ql-editor]:text-white [&_.ql-toolbar]:bg-[#1b2138] [&_.ql-toolbar]:border-yellow-500/20 [&_.ql-container]:border-yellow-500/20 [&_.ql-editor]:bg-[#0a0e1c]"
                     placeholder="Write your blog content here..."
                   />
                 </div>
@@ -629,7 +609,7 @@ const BlogsPage: FC = () => {
                     type="text"
                     value={editingBlog.topic}
                     disabled
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-blue-500/10 text-slate-400 cursor-not-allowed"
+                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-yellow-500/10 text-slate-400 cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -638,9 +618,9 @@ const BlogsPage: FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={getStatusLabel(editingBlog.status, editingBlog.publishStatus)}
+                    value="Draft"
                     disabled
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-blue-500/10 text-slate-400 cursor-not-allowed"
+                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-yellow-500/10 text-slate-400 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -662,7 +642,7 @@ const BlogsPage: FC = () => {
                     type="datetime-local"
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-blue-500/20 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-yellow-500/20 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
                   />
                   <div className="flex gap-2 mt-3">
                     <button
@@ -684,7 +664,7 @@ const BlogsPage: FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex flex-wrap items-center justify-end gap-2 p-4 border-t border-blue-500/10">
+            <div className="flex flex-wrap items-center justify-end gap-2 p-4 border-t border-yellow-500/10">
               <button
                 onClick={() => {
                   setShowEditModal(false);
@@ -702,7 +682,7 @@ const BlogsPage: FC = () => {
                 className="px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors text-sm inline-flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Save size={15} />
-                {isSaving ? 'Saving...' : 'Save as Draft'}
+                {isSaving ? 'Saving...' : 'Save Draft'}
               </button>
               
               <button
@@ -730,4 +710,4 @@ const BlogsPage: FC = () => {
   );
 };
 
-export default BlogsPage;
+export default DraftsPage;

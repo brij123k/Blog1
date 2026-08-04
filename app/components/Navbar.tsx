@@ -196,17 +196,15 @@ const NavbarInner: FC = () => {
 
   const handleMarketSave = useCallback(
     async (newMarkets: any): Promise<void> => {
+      console.log("handleMarketSave called with newMarkets:", newMarkets),  
       // 1. update the shared cache immediately (dashboard re-renders too)
       updateStoreData({ primaryMarket: newMarkets });
 
-      // 2. persist, if an endpoint is configured. Remove this block if your
-      //    MarketModal already saves to the backend itself.
-      const cfg: any = ApiConfig as any;
-      const endpoint = cfg.updateMarket || cfg.updatePrimaryMarket || cfg.updateStore;
+      const endpoint = ApiConfig.addCountry
       if (endpoint) {
         try {
           setSavingMarket(true);
-          await ApiService.post(endpoint, { primaryMarket: newMarkets });
+          await ApiService.post(endpoint, { markets: newMarkets });
         } catch (err) {
           console.error("Failed to save markets:", err);
           toast("Markets updated locally, but saving failed");
@@ -306,29 +304,32 @@ const pathnames = usePathname();
           className={"side-item" + (isActive("blogs", "all") ? " active" : "")}
         >
           <a href="/contents">
-          📝 Content Hub <span className="cnt">{count()}</span>
+          Content Hub
           </a>
         </button>
         <button
           type="button"
-          className={"side-item" + (isActive("blogs", "draft") ? " active" : "")}
-          onClick={() => go("blogs", "draft")}
+          className={"side-item" + (isActive("blogs", "draft") ? " active" : "")}     
         >
-          Draft blogs <span className="cnt">{count("draft")}</span>
+          <a href="/draft">
+          Draft blogs
+          </a>
         </button>
         <button
           type="button"
-          className={"side-item" + (isActive("blogs", "sched") ? " active" : "")}
-          onClick={() => go("blogs", "sched")}
+          className={"side-item" + (isActive("blogs", "sched") ? " active" : "")}    
         >
-          Scheduled blogs <span className="cnt">{count("sched")}</span>
+          <a href="/Schedule">
+          Scheduled blogs
+          </a>
         </button>
         <button
           type="button"
           className={"side-item" + (isActive("blogs", "pub") ? " active" : "")}
-          onClick={() => go("blogs", "pub")}
         >
-          Published blogs <span className="cnt">{count("pub")}</span>
+          <a href="/publish">
+          Published blogs
+          </a>
         </button>
 
         <div className="side-sec">SEO Tools</div>
@@ -339,13 +340,13 @@ const pathnames = usePathname();
         >
           🔍 Google Console {gscConnected && <span className="cnt">✓</span>}
         </button>
-        <button
+        {/* <button
           type="button"
           className={"side-item" + (isActive("backlinks") ? " active" : "")}
           onClick={() => go("backlinks")}
         >
-          🔗 Backlinks <span className="cnt">{backlinkCount}</span>
-        </button>
+          🔗 Backlinks
+        </button> */}
 
         <div className="side-sec">Account</div>
         <button

@@ -11,10 +11,10 @@ const nextConfig: NextConfig = {
   ],
   
 };
-// module.exports = {
-//   allowedDevOrigins: [
-//     "95d8-2409-40e3-2002-5b51-4074-93a6-29fb-d372.ngrok-free.app",
-//   ],
-// };
+module.exports = {
+  allowedDevOrigins: [
+    "746f-2409-40e3-20cd-325f-9844-d8ae-3559-4f2c.ngrok-free.app",
+  ],
+};
 
 export default nextConfig;

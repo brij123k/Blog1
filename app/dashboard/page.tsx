@@ -2003,7 +2003,8 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
   // --- Toast ---
   const [toastMsg, setToastMsg] = useState<string>("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const [generatingTopics, setGeneratingTopics] = useState(false);
+const [topicError, setTopicError] = useState("");
   const [campaignCalendar, setCampaignCalendar] = useState<{
   type: string;
   name: string;
@@ -2055,7 +2056,13 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
   // Arrow hint pointing at the "New titles" button (first time per page load)
   const [topicsHint, setTopicsHint] = useState<boolean>(false);
   const topicsHintShownRef = useRef<boolean>(false);
+  // User plan state
+const [userPlan, setUserPlan] = useState<any>(null);
+const [remainingArticles, setRemainingArticles] = useState<number>(0);
+const [remainingTopics, setRemainingTopics] = useState<number>(0);
+const [showPlanLimitModal, setShowPlanLimitModal] = useState<boolean>(false);
 
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const toast = useCallback((message: string): void => {
     setToastMsg(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -2111,9 +2118,103 @@ const [campaignKeywords, setCampaignKeywords] = useState<CampaignKeywords>({
     }
   }, []);
 
-  // Once topics are loaded, merge in any product selection that was saved
-  // locally in a previous visit (matched by topic name, since topic ids are
-  // regenerated on every load).
+const handleGenerateTitles = async (reference?: string) => {
+  try {
+    setGeneratingTopics(true);
+    setTopicError("");
+
+    // Check if user has reached their topic limit
+    const remainingTopicsCount = getRemainingTopics();
+    if (remainingTopicsCount <= 0) {
+      toast("You've reached your topic limit. Please upgrade your plan.");
+      setGeneratingTopics(false);
+      return;
+    }
+
+    const payload: any = {};
+
+    if (reference) {
+      payload.reference = reference;
+    }
+
+    const response = await ApiService.post(
+      ApiConfig.generateTitle,
+      payload
+    );
+
+    if (response?.success) {
+      const newTopics = response.blogTopics.map(
+        (topic: any, index: number) => ({
+          id: String(index),
+          name: topic.title,
+          keyword: topic.keyword,
+          intent: topic.intent,
+          difficulty: topic.difficulty,
+          priority: topic.priority,
+        })
+      );
+
+      // Limit topics based on user's plan
+      const maxTopics = getMaxTopics();
+      const limitedTopics = newTopics.slice(0, maxTopics);
+      
+      setTopics(limitedTopics);
+
+      // automatically select the first topic
+      if (limitedTopics.length > 0) {
+        setSelectedTopic(limitedTopics[0]);
+        setSelTopics(new Set([limitedTopics[0].id]));
+      }
+    }
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Something went wrong.";
+
+    setTopicError(message);
+    toast(message);
+  } finally {
+    setGeneratingTopics(false);
+  }
+};
+const getUserPlan = (): any => {
+  try {
+    const plan = localStorage.getItem('userPlan');
+    return plan ? JSON.parse(plan) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getMaxTopics = (): number => {
+  const plan = getUserPlan();
+  return plan?.limits?.topics || 15; // Default to 15 if no plan
+};
+
+const getRemainingArticles = (): number => {
+  const plan = getUserPlan();
+  return plan?.remaining?.articles || 0;
+};
+
+const getRemainingTopics = (): number => {
+  const plan = getUserPlan();
+  return plan?.remaining?.topics || 0;
+};
+
+useEffect(() => {
+  const loadUserPlan = () => {
+    const plan = getUserPlan();
+    console.log("Loaded user plan:", plan);
+    if (plan) {
+      setUserPlan(plan);
+      setRemainingArticles(plan?.remaining?.articles || 0);
+      setRemainingTopics(plan?.remaining?.topics || 0);
+    }
+  };
+  loadUserPlan();
+}, []);
+
   useEffect(() => {
     if (topics.length === 0) return;
     try {
@@ -2413,22 +2514,29 @@ return storeData.competitors.map((c) => ({
 
   // NEW: Step 1 -> Step 2 transition. Called from the Topics card's primary
   // button; moves the user straight into the Product selection step.
-  const goToProductStep = (): void => {
-    if (selTopics.size === 0) {
-      toast("Select at least one topic first.");
-      return;
-    }
-    setActiveStar("topics");
-    setShowProductConfig(true);
-    // Auto-select the first topic so the user immediately sees where
-    // products will be attached — no guessing.
-    const first = topics.find((t) => selTopics.has(t.id));
-    setActiveTopicForProduct(first ? first.id : null);
-    setProductSearch("");
-    // Load the collection filter + preload products so grids aren't empty.
-    if (pickerCollections.length === 0) fetchPickerCollections();
-    fetchProductsForSearch("");
-  };
+const goToProductStep = (): void => {
+  if (selTopics.size === 0) {
+    toast("Select at least one topic first.");
+    return;
+  }
+
+  // Check if user has enough remaining articles for selected topics
+  const selectedCount = selTopics.size;
+  const remaining = getRemainingArticles();
+  
+  if (remaining < selectedCount) {
+    setShowPlanLimitModal(true);
+    return;
+  }
+
+  setActiveStar("topics");
+  setShowProductConfig(true);
+  const first = topics.find((t) => selTopics.has(t.id));
+  setActiveTopicForProduct(first ? first.id : null);
+  setProductSearch("");
+  if (pickerCollections.length === 0) fetchPickerCollections();
+  fetchProductsForSearch("");
+};
 
   // Open product config view (still used by the "Product" star on the portal)
   const openProductConfig = async (): Promise<void> => {
@@ -2484,56 +2592,64 @@ return storeData.competitors.map((c) => ({
   };
 
   // Start blog generation sequentially
-  const startGeneration = async (): Promise<void> => {
-    closeWiz();
-    const selTopicsArr = selectedTopicList();
-    if (selTopicsArr.length === 0) {
-      toast("No topics selected");
-      return;
-    }
-    setBlogs([]);
-    setBlogOpen(true);
-    setGenerating(true);
+const startGeneration = async (): Promise<void> => {
+  closeWiz();
+  const selTopicsArr = selectedTopicList();
+  if (selTopicsArr.length === 0) {
+    toast("No topics selected");
+    return;
+  }
 
-    toast("Generating blogs…");
-    for (const topic of selTopicsArr) {
-      const productIds = topicProductsMap[topic.id] || [];
-      try {
-        const res = await ApiService.post(ApiConfig.CREATE_BLOG, {
-          topic: topic.name,
-          products: productIds,
-        });
-        const blogData = res?.blog || res;
-        let heroImg = blogData.heroImage?.url;
-        if (heroImg && heroImg.startsWith('/')) {
-          heroImg = API + heroImg;
-        }
-        console.log(`Generated blog for topic "${heroImg}":`, blogData);
-        if (blogData) {
-          const newBlog: Blog = {
-            id: blogData._id || uid(),
-            topic: topic.name,
-            title: blogData.title || topic.name,
-            html: blogData.content || "",
-            status: "none",
-            heroImageUrl: heroImg,
-            heroImagePrompt: blogData.heroImagePrompt,
-          };
-          setBlogs((prev) => [...prev, newBlog]);
-        }
-      } catch (err) {
-        console.error(`Failed to generate blog for topic "${topic.name}":`, err);
-        toast(`Error generating blog for "${topic.name}"`);
-        // Still continue with next topics
+  // Check if user has enough remaining articles
+  const remaining = getRemainingArticles();
+  if (remaining < selTopicsArr.length) {
+    setShowPlanLimitModal(true);
+    return;
+  }
+
+  setBlogs([]);
+  setBlogOpen(true);
+  setGenerating(true);
+
+  toast("Generating blogs…");
+  for (const topic of selTopicsArr) {
+    const productIds = topicProductsMap[topic.id] || [];
+    try {
+      const res = await ApiService.post(ApiConfig.CREATE_BLOG, {
+        topic: topic.name,
+        products: productIds,
+      });
+      const blogData = res?.blog || res;
+      let heroImg = blogData.heroImage?.url;
+      if (heroImg && heroImg.startsWith('/')) {
+        heroImg = API + heroImg;
       }
+      console.log(`Generated blog for topic "${heroImg}":`, blogData);
+      if (blogData) {
+        const newBlog: Blog = {
+          id: blogData._id || uid(),
+          topic: topic.name,
+          title: blogData.title || topic.name,
+          html: blogData.content || "",
+          status: "none",
+          heroImageUrl: heroImg,
+          heroImagePrompt: blogData.heroImagePrompt,
+        };
+        setBlogs((prev) => [...prev, newBlog]);
+        // Decrement remaining articles locally
+        setRemainingArticles(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error(`Failed to generate blog for topic "${topic.name}":`, err);
+      toast(`Error generating blog for "${topic.name}"`);
     }
-    setGenerating(false);
-    toast("All blogs generated!");
-  };
+  }
+  setGenerating(false);
+  toast("All blogs generated!");
+};
 
-  // Entry point for the "generator" knob: does NOT open the wizard, just
-  // uses whatever topics/products are currently selected (including
-  // anything restored from local storage) and kicks off generation directly.
+
+
   const handleGeneratorClick = (): void => {
     if (!storeData) {
       toast("Store data not loaded yet");
@@ -3706,31 +3822,38 @@ if (loading) {
                     Step 1 of 3 — Select topics, then continue to product selection.
                   </div>
                   <div className="nt-toolbar">
-                    <div className="product-search-box nt-promptbox">
-                      <span className="search-icon">✦</span>
-                      <input
-                        placeholder='Optional: describe titles you want, e.g. "Diwali gift ideas"'
-                        value={titlePrompt}
-                        onChange={(e) => setTitlePrompt(e.target.value)}
-                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                          if (e.key === "Enter" && !refreshingTopics) refreshTopics();
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-pri btn-sm"
-                      onClick={refreshTopics}
-                      disabled={refreshingTopics}
-                    >
-                      {refreshingTopics ? (
-                        <>
-                          <span className="spin" /> Generating…
-                        </>
-                      ) : (
-                        <>↻ New titles</>
-                      )}
-                    </button>
+  <div className="product-search-box nt-promptbox">
+    <span className="search-icon">✦</span>
+    <input
+      placeholder='Optional: describe titles you want, e.g. "Diwali gift ideas"'
+      value={titlePrompt}
+      onChange={(e) => setTitlePrompt(e.target.value)}
+      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && !refreshingTopics) {
+          // Pass the input value as reference
+          handleGenerateTitles(titlePrompt.trim() || undefined);
+        }
+      }}
+    />
+  </div>
+  <button
+    type="button"
+    className="btn btn-pri btn-sm"
+    disabled={generatingTopics}
+    onClick={() => {
+      // Pass the input value as reference
+      const reference = titlePrompt.trim() || undefined;
+      handleGenerateTitles(reference);
+    }}
+  >
+    {generatingTopics ? (
+      <>
+        <span className="spin" /> Generating…
+      </>
+    ) : (
+      <>↻ New titles</>
+    )}
+  </button>
 
                     {/* Floating arrow hint anchored below the New titles
                         button — overlays the content, never displaces it */}
@@ -4153,7 +4276,76 @@ if (loading) {
       <div className={"toast" + (toastMsg ? " show" : "")}>{toastMsg}</div>
 
       {/* Market editing now lives in the global navbar (components/Navbar.tsx) */}
-
+      {/* Plan Limit Modal */}
+{showPlanLimitModal && (
+  <div className="ov open">
+    <div className="ov-bd" onClick={() => setShowPlanLimitModal(false)} />
+    <div className="blogwrap" style={{ maxWidth: 500 }}>
+      <div className="blog-head">
+        <h2>Plan Limit Reached</h2>
+        <button
+          type="button"
+          className="abtn"
+          onClick={() => setShowPlanLimitModal(false)}
+        >
+          ✕
+        </button>
+      </div>
+      <div className="blog-body">
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+          <h3 style={{ color: "#eef2ff", marginBottom: 12 }}>
+            You've reached your article limit
+          </h3>
+          <p style={{ color: "#9fb0d8", lineHeight: 1.6 }}>
+            You have <strong style={{ color: "#9cc2ff" }}>{getRemainingArticles()}</strong> articles remaining.
+            <br />
+            You need <strong style={{ color: "#ffce7a" }}>{selTopics.size}</strong> articles for this generation.
+          </p>
+          <div style={{ 
+            margin: "20px 0",
+            padding: "16px",
+            background: "rgba(8,12,26,.6)",
+            borderRadius: 12,
+            border: "1px solid rgba(130,160,255,.2)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#8ea0cc", fontSize: 14 }}>
+              <span>Remaining articles</span>
+              <span style={{ color: "#eef2ff" }}>{getRemainingArticles()}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#8ea0cc", fontSize: 14, marginTop: 8 }}>
+              <span>Topics selected</span>
+              <span style={{ color: "#ffce7a" }}>{selTopics.size}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#8ea0cc", fontSize: 14, marginTop: 8 }}>
+              <span>Plan</span>
+              <span style={{ color: "#9cc2ff" }}>{userPlan?.planId?.name || "Basic"}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 16 }}>
+            <button
+              type="button"
+              className="btn btn-gho"
+              onClick={() => setShowPlanLimitModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-pri"
+              onClick={() => {
+                // Navigate to upgrade page
+                window.location.href = "/pricing";
+              }}
+            >
+              Upgrade Plan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 };

@@ -17,11 +17,13 @@ const ApiConfig = {
   GENERATE_BLOGCAMPAIGN: "/blog/generate-campaign",
   PUBLISH_BLOG:(blogId:string)=>`/publish/${blogId}`,
   SCHEDULE_BLOG:(blogId:string)=>`/publish/${blogId}/schedule`,
+  UPDATE_BLOG:(blogId:string)=>`/blog/${blogId}/update`,
   // Shopify
   PRODUCTS: "/shopify/products",
   COLLECTIONS: "/shopify/collections",
   getCountry:"country-events",
   addCountry:"/store-intelligence/primary-market",
+  generateTitle:"/store-intelligence/topics/generate",
   getEvents:(country:string)=>`country-events/${country}`,
   saveBlogDraft:(blogId:string)=>`/blog/${blogId}/draft`,
   

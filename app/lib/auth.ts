@@ -1,7 +1,8 @@
 import { getShopifyData } from "./shopify";
 import { storage } from "./storage";
 import {API} from "./api"
-
+import ApiService from "./service";
+import ApiConfig from "./apiConfig";
 export async function authenticateShopify() {
   const shopify = getShopifyData();
 
@@ -31,7 +32,9 @@ export async function authenticateShopify() {
     }
 
     storage.setToken(data.accessToken);
-
+    const subscriptionResponse = await ApiService.get(ApiConfig.userPlan);
+    console.log("Subscription Response:", subscriptionResponse);
+    storage.setUserPlan(subscriptionResponse);
     if (data.user) {
       storage.setUser(data.user);
     }
