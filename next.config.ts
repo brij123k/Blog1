@@ -9,12 +9,9 @@ const nextConfig: NextConfig = {
     "@react-three/drei",
     "@react-three/postprocessing",
   ],
-  
+  allowedDevOrigins: [
+    "0b17-111-223-30-28.ngrok-free.app",
+  ],
 };
-// module.exports = {
-//   allowedDevOrigins: [
-//     "746f-2409-40e3-20cd-325f-9844-d8ae-3559-4f2c.ngrok-free.app",
-//   ],
-// };
 
 export default nextConfig;

@@ -265,8 +265,6 @@ const pathnames = usePathname();
         {/* ===== Store card + PRIMARY MARKET editing area ===== */}
         {storeData ? (
           <div className="side-store">
-            <div className="ss-name">{storeData.shopDomain || "My store"}</div>
-            <div className="ss-meta">{(storeData.niche || "").slice(0, 48)}</div>
             <div className="ss-meta ss-market">
               <span title={marketLabel}>Market: {marketLabel}</span>
               <button

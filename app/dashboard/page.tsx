@@ -2068,6 +2068,7 @@ const [showPlanLimitModal, setShowPlanLimitModal] = useState<boolean>(false);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(""), 2200);
   }, []);
+  
   // ==========================================================================
   // Store analysis (shared with the global Navbar via app/lib/appStore.tsx)
   // ==========================================================================
@@ -2100,7 +2101,9 @@ const [showPlanLimitModal, setShowPlanLimitModal] = useState<boolean>(false);
         })
       );
       setTopics(loadedTopics);
-      setSelTopics(new Set(loadedTopics.map((t) => t.id)));
+       if (loadedTopics.length > 0) {
+        setSelTopics(new Set([loadedTopics[0].id]));
+      }
     }
   }, [sharedStore]);
 
@@ -3026,236 +3029,6 @@ const startGeneration = async (): Promise<void> => {
   const filteredBlogs =
     blogTab === "all" ? allBlogs : allBlogs.filter((b) => b.status === blogTab);
 
-  // ----- Content Hub: drafts / scheduled / published in one page -----
-  const renderBlogsPage = () => (
-    <div className="page">
-      <h2>Content Hub</h2>
-      <div className="psub">
-        Manage all your blogs in one place - save drafts, schedule for later, or publish now.
-      </div>
-      <div className="tabbar">
-        <div className={"tab" + (blogTab === "all" ? " active" : "")} onClick={() => setBlogTab("all")}>
-          All ({allBlogs.length})
-        </div>
-        <div className={"tab" + (blogTab === "draft" ? " active" : "")} onClick={() => setBlogTab("draft")}>
-          Drafts ({blogCounts.draft})
-        </div>
-        <div className={"tab" + (blogTab === "sched" ? " active" : "")} onClick={() => setBlogTab("sched")}>
-          Scheduled ({blogCounts.sched})
-        </div>
-        <div className={"tab" + (blogTab === "pub" ? " active" : "")} onClick={() => setBlogTab("pub")}>
-          Published ({blogCounts.pub})
-        </div>
-      </div>
-
-      {loadingBlogs ? (
-        <div className="empty">
-          <span className="spin" /> Loading blogs…
-        </div>
-      ) : filteredBlogs.length === 0 ? (
-        <div className="empty">
-          No blogs here yet. Go to the Dashboard and use <strong>preview → Topics → Products</strong> to generate blogs.
-        </div>
-      ) : (
-        filteredBlogs.map((b) => (
-          <div key={b.id} className="blog-row">
-            <span className={"badge " + STATUS_BADGE[b.status || "none"].cls}>
-              {STATUS_BADGE[b.status || "none"].label}
-            </span>
-            <span className="bt">{b.title}</span>
-            <button
-              type="button"
-              className="abtn"
-              onClick={() => openEditBlog(b)}
-            >
-              ✎ Edit
-            </button>
-            <button type="button" className="abtn" onClick={() => blogAction(b, "draft")}>
-              Save Draft
-            </button>
-            <button
-              type="button"
-              className="abtn sch"
-              onClick={() => {
-                setSchedFor(schedFor === b.id ? null : b.id);
-                setSchedDate("");
-              }}
-            >
-              Schedule
-            </button>
-            <button type="button" className="abtn pub" onClick={() => blogAction(b, "pub")}>
-              Publish
-            </button>
-            {schedFor === b.id && (
-              <div className="schbox">
-                <input
-                  type="datetime-local"
-                  value={schedDate}
-                  onChange={(e) => setSchedDate(e.target.value)}
-                  style={{
-                    background: "rgba(8,12,26,.85)",
-                    color: "#eef2ff",
-                    border: "1px solid rgba(130,160,255,.25)",
-                  }}
-                />
-                <button
-                  type="button"
-                  className="abtn sch"
-                  onClick={() => {
-                    if (!schedDate) {
-                      toast("Pick a date & time first");
-                      return;
-                    }
-                    blogAction(b, "sched", new Date(schedDate).toISOString());
-                    setSchedFor(null);
-                  }}
-                >
-                  Confirm schedule
-                </button>
-              </div>
-            )}
-            {b.topic && <div className="bmeta">Topic: {b.topic}</div>}
-          </div>
-        ))
-      )}
-    </div>
-  );
-
-  // ----- Google Search Console -----
-  const renderConsolePage = () => (
-    <div className="page">
-      <h2>Google Search Console</h2>
-      <div className="psub">
-        Connect Google Search Console to see how your blogs perform in Google Search - clicks, impressions, CTR and average position.
-      </div>
-
-      {!gscConnected ? (
-        <>
-          <div className="field" style={{ maxWidth: 560 }}>
-            <input
-              placeholder="Your site URL (e.g. https://mystore.com)"
-              value={gscSite}
-              onChange={(e) => setGscSite(e.target.value)}
-            />
-            <button type="button" className="btn btn-pri" onClick={connectGSC}>
-              Connect Google Console
-            </button>
-          </div>
-          <div className="muted">
-            Real Google sign-in needs a backend OAuth route. Add{" "}
-            <code>GSC_AUTH_URL</code> to your ApiConfig pointing to your server's Google OAuth endpoint
-            (scope: webmasters.readonly). Until then, the connection is saved locally so you can test the flow.
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="muted" style={{ marginBottom: 16 }}>
-            Connected site:{" "}
-            <strong style={{ color: "#9cc2ff" }}>{gscSite}</strong>
-            <button type="button" className="abtn" style={{ marginLeft: 12 }} onClick={disconnectGSC}>
-              Disconnect
-            </button>
-          </div>
-          <div className="gsc-stats">
-            <div className="gsc-stat">
-              <span className="gv">—</span>
-              <span className="gl">Total clicks (28 days)</span>
-            </div>
-            <div className="gsc-stat">
-              <span className="gv">—</span>
-              <span className="gl">Total impressions</span>
-            </div>
-            <div className="gsc-stat">
-              <span className="gv">—</span>
-              <span className="gl">Average CTR</span>
-            </div>
-            <div className="gsc-stat">
-              <span className="gv">—</span>
-              <span className="gl">Average position</span>
-            </div>
-          </div>
-          <div className="muted">
-            Metrics will fill in once your backend exposes a <code>GSC_STATS</code> endpoint that
-            proxies the Search Console API for the connected site.
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  // ----- Backlinks -----
-  const renderBacklinksPage = () => (
-    <div className="page">
-      <h2>Backlinks</h2>
-      <div className="psub">
-        Track backlinks pointing to your store and blogs. Add links you have built or discovered.
-      </div>
-
-      <div className="field" style={{ flexWrap: "wrap", gap: 8 }}>
-        <input
-          placeholder="Backlink URL (e.g. https://partner-site.com/article)"
-          value={blUrl}
-          onChange={(e) => setBlUrl(e.target.value)}
-          style={{ minWidth: 260 }}
-        />
-        <input
-          placeholder="Anchor text (optional)"
-          value={blAnchor}
-          onChange={(e) => setBlAnchor(e.target.value)}
-          style={{ minWidth: 180 }}
-        />
-        <input
-          placeholder="Target page on your store (optional)"
-          value={blTarget}
-          onChange={(e) => setBlTarget(e.target.value)}
-          style={{ minWidth: 220 }}
-        />
-        <button type="button" className="btn btn-pri" onClick={addBacklink}>
-          + Add backlink
-        </button>
-      </div>
-
-      {backlinks.length === 0 ? (
-        <div className="empty">No backlinks tracked yet. Add your first one above.</div>
-      ) : (
-        <table className="bl-table">
-          <thead>
-            <tr>
-              <th>Backlink URL</th>
-              <th>Anchor text</th>
-              <th>Target page</th>
-              <th>Added</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {backlinks.map((b) => (
-              <tr key={b.id}>
-                <td>
-                  <a href={b.url} target="_blank" rel="noreferrer" style={{ color: "#9cc2ff" }}>
-                    {b.url}
-                  </a>
-                </td>
-                <td>{b.anchor || "—"}</td>
-                <td>{b.target || "—"}</td>
-                <td>{new Date(b.addedAt).toLocaleDateString()}</td>
-                <td>
-                  <button type="button" className="abtn" onClick={() => removeBacklink(b.id)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="muted" style={{ marginTop: 14 }}>
-        Tip: for automatic backlink discovery, connect Google Search Console above (Links report) or add a
-        <code> BACKLINKS</code> endpoint in ApiConfig that proxies an SEO API (Ahrefs / Semrush / Moz).
-      </div>
-    </div>
-  );
-
 if (loading) {
   return (
     <>
@@ -3586,10 +3359,6 @@ if (loading) {
           </div>
         </div>
         )}
-
-        {view === "blogs" && renderBlogsPage()}
-        {view === "console" && renderConsolePage()}
-        {view === "backlinks" && renderBacklinksPage()}
         </div>
       </div>
 
@@ -4186,14 +3955,6 @@ if (loading) {
           toast={toast}
         />
       )}
-      {/* {blogOpen && (
-  <BlogEditorModal
-    blogs={blogs}
-    generating={generating}
-    onClose={() => setBlogOpen(false)}
-    toast={toast}
-  />
-)} */}
 
       {/* ===== Edit blog modal (opened from Content Hub) ===== */}
       {editBlog && (

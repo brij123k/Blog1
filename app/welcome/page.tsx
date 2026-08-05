@@ -282,6 +282,7 @@ const Only1Dashboard: React.FC = () => {
     .filter(Boolean)
     .join(" ");
  const handleStartNow = () => {
+   localStorage.setItem("visited", "true");
     window.location.href = "/dashboard";
   };
   return (

@@ -19,13 +19,16 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Copy,
+  Download
 } from "lucide-react";
 import toast, { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 import ApiService from "../lib/service";
 import ApiConfig from "../lib/apiConfig";
+import { API } from "../lib/api";
 
 // Dynamic import with no SSR using react-quill-new
 const ReactQuill = dynamic(
@@ -53,6 +56,7 @@ interface Blog {
   metaDescription: string;
   excerpt: string;
   heroImagePrompt: string;
+  heroImageUrl?: string;
   estimatedReadingTime: string;
   keywords: string[];
   content: string;
@@ -78,6 +82,30 @@ interface Pagination {
   hasPrev: boolean;
 }
 
+// Theme constants matching BlogEditorModal
+const T = {
+  panelBg: "linear-gradient(180deg, #1b2136 0%, #10141f 100%)",
+  panelBorder: "1px solid rgba(130,160,255,.22)",
+  panelShadow: "0 0 0 1px rgba(130,160,255,.10), 0 0 60px rgba(61,147,255,.15), 0 30px 90px rgba(0,0,0,.7)",
+  headBg: "rgba(10,14,28,.6)",
+  headBorder: "1px solid rgba(130,160,255,.18)",
+  cardBg: "rgba(10,14,28,.55)",
+  cardBorder: "1px solid rgba(130,160,255,.18)",
+  cardShadow: "0 1px 1px rgba(160,195,255,.05) inset, 0 8px 20px rgba(0,0,0,.3)",
+  divider: "1px solid rgba(130,160,255,.15)",
+  actionsBg: "rgba(8,12,26,.55)",
+  heading: "#eef2ff",
+  body: "#dbe4fb",
+  muted: "#8ea0cc",
+};
+
+const BLOG_STATUS_MAP: Record<string, { cls: string; label: string }> = {
+  none: { cls: "b-none", label: "Unsaved" },
+  draft: { cls: "b-draft", label: "Draft" },
+  sched: { cls: "b-sched", label: "Scheduled" },
+  pub: { cls: "b-pub", label: "Published ✓" },
+};
+
 const BlogsPage: FC = () => {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -102,8 +130,11 @@ const BlogsPage: FC = () => {
   const [editContent, setEditContent] = useState<string>("");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  
+  // Schedule modal
+  const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
   const [scheduleDate, setScheduleDate] = useState<string>("");
-  const [showSchedulePicker, setShowSchedulePicker] = useState<boolean>(false);
+  const [schedulingBlogId, setSchedulingBlogId] = useState<string>("");
 
   // Quill modules configuration
   const quillModules = {
@@ -140,7 +171,20 @@ const BlogsPage: FC = () => {
       if (statusFilter) params.status = statusFilter;
       
       const response = await ApiService.get(ApiConfig.ALLBLOGS, params);
-      setBlogs(response.data || []);
+      const blogs = (response.data || []).map((blog: any) => {
+  let heroImg = blog.heroImage?.url;
+
+  if (heroImg && heroImg.startsWith("/")) {
+    heroImg = API + heroImg;
+  }
+
+  return {
+    ...blog,
+    heroImageUrl: heroImg,
+  };
+});
+
+setBlogs(blogs);
       setPagination(response.pagination || {
         total: 0,
         page: 1,
@@ -160,6 +204,69 @@ const BlogsPage: FC = () => {
   useEffect(() => {
     fetchBlogs();
   }, [fetchBlogs]);
+
+  // Handle copy content
+  const handleCopy = async (content: string) => {
+    try {
+      const plainText = new DOMParser().parseFromString(content, 'text/html').body.textContent || '';
+      await navigator.clipboard.writeText(plainText);
+      toast.success("Content copied to clipboard!");
+    } catch {
+      toast.error("Failed to copy content");
+    }
+  };
+
+  // Handle download HTML
+  const handleDownload = (blog: Blog) => {
+    const heroImageHtml = blog.heroImageUrl ? `<img src="${blog.heroImageUrl}" alt="${blog.title}" style="max-width:100%;margin:1em 0;border-radius:8px;">` : '';
+    
+    const fullHtml = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${blog.title}</title>
+  <style>
+    body { 
+      max-width: 800px; 
+      margin: 40px auto; 
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    }
+    img { max-width: 100%; height: auto; }
+    h1, h2, h3, h4 { margin-top: 1.5em; }
+    blockquote { 
+      border-left: 4px solid #ccc; 
+      margin: 1.5em 0; 
+      padding: 0.5em 1em;
+      background: #f9f9f9;
+    }
+    .hero-image {
+      width: 100%;
+      max-height: 400px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin: 1em 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>${blog.title}</h1>
+  ${heroImageHtml}
+  ${blog.content}
+</body>
+</html>`;
+    
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (blog.title || "blog").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".html";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Blog downloaded!");
+  };
 
   // Handle save as draft
   const handleSaveAsDraft = async (blogId: string) => {
@@ -211,8 +318,15 @@ const BlogsPage: FC = () => {
     }
   };
 
-  // Handle schedule
-  const handleSchedule = async (blogId: string) => {
+  // Open schedule modal
+  const openScheduleModal = (blogId: string) => {
+    setSchedulingBlogId(blogId);
+    setScheduleDate(new Date(Date.now() + 3600000).toISOString().slice(0, 16));
+    setShowScheduleModal(true);
+  };
+
+  // Handle schedule from modal
+  const handleSchedule = async () => {
     if (!scheduleDate) {
       toast.error("Please select a date and time");
       return;
@@ -225,16 +339,17 @@ const BlogsPage: FC = () => {
     
     setIsSaving(true);
     try {
-      await ApiService.post(ApiConfig.SCHEDULE_BLOG?.(blogId) || `/blogs/${blogId}/schedule`, {
-        blogId,
+      await ApiService.post(ApiConfig.SCHEDULE_BLOG(schedulingBlogId), {
+        blogId: schedulingBlogId,
         title: editTitle.trim() || editingBlog?.title,
         content: editContent,
-        scheduledAt: new Date(scheduleDate).toISOString(),
+        scheduledFor: new Date(scheduleDate).toISOString(),
       });
+
       toast.success("Blog scheduled successfully! 📅");
       await fetchBlogs();
       setShowEditModal(false);
-      setShowSchedulePicker(false);
+      setShowScheduleModal(false);
     } catch (error) {
       console.error("Failed to schedule:", error);
       toast.error("Failed to schedule blog");
@@ -249,8 +364,7 @@ const BlogsPage: FC = () => {
     setEditTitle(blog.title);
     setEditContent(blog.content);
     setShowEditModal(true);
-    setShowSchedulePicker(false);
-    setScheduleDate("");
+    setShowScheduleModal(false);
   };
 
   // Format date
@@ -460,12 +574,28 @@ const BlogsPage: FC = () => {
                     </div>
                     
                     <div className="flex flex-wrap gap-2 flex-shrink-0">
+                      {!blog.shopifyUrl && (
                       <button
                         onClick={() => openEditModal(blog)}
                         className="px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors text-sm inline-flex items-center gap-1.5"
                       >
                         <Edit size={15} />
                         Edit
+                      </button>
+                      )}
+                      <button
+                        onClick={() => handleCopy(blog.content)}
+                        className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm inline-flex items-center gap-1.5"
+                      >
+                        <Copy size={15} />
+                        Copy
+                      </button>
+                      <button
+                        onClick={() => handleDownload(blog)}
+                        className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm inline-flex items-center gap-1.5"
+                      >
+                        <Download size={15} />
+                        Download
                       </button>
                       {blog.shopifyUrl && (
                         <a
@@ -560,21 +690,204 @@ const BlogsPage: FC = () => {
         </>
       )}
 
-      {/* Edit Modal */}
-      {showEditModal && editingBlog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-gradient-to-b from-[#1b2138] to-[#0f1321] border border-blue-500/20 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      {/* Edit Modal - Updated with BlogEditorModal design and z-index 1001 */}
+     {showEditModal && editingBlog && (
+  <div 
+    className="fixed inset-0 z-[1001] flex items-start justify-center p-4 bg-black/70 backdrop-blur-sm" 
+    style={{ paddingTop: "20px" }}
+    onClick={() => {
+      setShowEditModal(false);
+      setShowScheduleModal(false);
+    }}
+  >
+    <div 
+      className="bg-gradient-to-b from-[#1b2136] to-[#10141f] border border-[rgba(130,160,255,.22)] rounded-xl w-full max-w-5xl max-h-[calc(100vh-40px)] overflow-hidden flex flex-col shadow-[0_0_0_1px_rgba(130,160,255,.10),0_0_60px_rgba(61,147,255,.15),0_30px_90px_rgba(0,0,0,.7)]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Modal Header */}
+      <div className="flex items-center justify-between p-4 bg-[rgba(10,14,28,.6)] border-b border-[rgba(130,160,255,.18)] flex-shrink-0">
+        <h2 className="text-xl font-semibold text-[#eef2ff] flex items-center gap-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-[#eaf2ff] to-[#6294ec] shadow-[0_0_12px_rgba(98,148,236,.9)]"></span>
+          Edit Blog
+        </h2>
+        <button
+          onClick={() => {
+            setShowEditModal(false);
+            setShowScheduleModal(false);
+          }}
+          className="px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors text-sm"
+        >
+          Close
+        </button>
+      </div>
+
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Hero Image - Now inside scrollable area */}
+        {editingBlog.heroImageUrl && (
+          <div className="relative w-full">
+            <img
+              src={editingBlog.heroImageUrl}
+              alt={editingBlog.title}
+              className="w-full max-h-[400px] object-cover"
+            />
+          </div>
+        )}
+
+        {/* Modal Body */}
+        <div className="p-4 space-y-4">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-[#dbe4fb] mb-1.5">
+              Title
+            </label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-[rgba(130,160,255,.2)] text-[#eef2ff] focus:outline-none focus:border-[rgba(130,160,255,.5)] transition-colors placeholder-slate-500"
+              placeholder="Blog title..."
+            />
+          </div>
+
+          {/* Content Editor */}
+          <div>
+            <label className="block text-sm font-medium text-[#dbe4fb] mb-1.5">
+              Content (Rich Text)
+            </label>
+            <div className="bg-[#0a0e1c]/80 rounded-lg border border-[rgba(130,160,255,.2)] overflow-hidden">
+              <ReactQuill
+                theme="snow"
+                value={editContent}
+                onChange={setEditContent}
+                modules={quillModules}
+                formats={quillFormats}
+                className="text-white min-h-[300px] [&_.ql-editor]:min-h-[300px] [&_.ql-editor]:text-[#dbe4fb] [&_.ql-editor]:bg-transparent [&_.ql-toolbar]:bg-[#1b2136] [&_.ql-toolbar]:border-[rgba(130,160,255,.15)] [&_.ql-container]:border-[rgba(130,160,255,.15)] [&_.ql-editor]:bg-[#0a0e1c]"
+                placeholder="Write your blog content here..."
+              />
+            </div>
+          </div>
+
+          {/* Meta Info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[#dbe4fb] mb-1.5">
+                Topic
+              </label>
+              <input
+                type="text"
+                value={editingBlog.topic}
+                disabled
+                className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-[rgba(130,160,255,.1)] text-[#8ea0cc] cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#dbe4fb] mb-1.5">
+                Status
+              </label>
+              <input
+                type="text"
+                value={getStatusLabel(editingBlog.status, editingBlog.publishStatus)}
+                disabled
+                className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-[rgba(130,160,255,.1)] text-[#8ea0cc] cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          {editingBlog.publishError && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+              <AlertCircle size={16} />
+              {editingBlog.publishError}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Footer - Fixed at bottom */}
+      <div className="flex flex-wrap items-center justify-end gap-2 p-4 border-t border-[rgba(130,160,255,.15)] bg-[rgba(8,12,26,.55)] flex-shrink-0">
+        <button
+          onClick={() => {
+            setShowEditModal(false);
+            setShowScheduleModal(false);
+          }}
+          className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm"
+        >
+          Cancel
+        </button>
+        
+        <button
+          onClick={() => handleCopy(editContent)}
+          className="px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors text-sm"
+        >
+          <Copy size={15} className="inline mr-1.5" />
+          Copy
+        </button>
+        
+        <button
+          onClick={() => {
+            if (editingBlog) {
+              handleDownload({
+                ...editingBlog,
+                content: editContent,
+                title: editTitle
+              });
+            }
+          }}
+          className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm"
+        >
+          <Download size={15} className="inline mr-1.5" />
+          Download HTML
+        </button>
+        
+        <button
+          onClick={() => handleSaveAsDraft(editingBlog._id)}
+          disabled={isSaving}
+          className="px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors text-sm disabled:opacity-50"
+        >
+          <Save size={15} className="inline mr-1.5" />
+          {isSaving ? 'Saving...' : 'Save Draft'}
+        </button>
+        
+        <button
+          onClick={() => openScheduleModal(editingBlog._id)}
+          disabled={isSaving}
+          className="px-4 py-2 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors text-sm disabled:opacity-50"
+        >
+          <Calendar size={15} className="inline mr-1.5" />
+          Schedule
+        </button>
+        
+        <button
+          onClick={() => handlePublish(editingBlog._id)}
+          disabled={isSaving}
+          className="px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors text-sm disabled:opacity-50"
+        >
+          <Send size={15} className="inline mr-1.5" />
+          {isSaving ? 'Publishing...' : 'Publish'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Schedule Modal - z-index 1002 */}
+      {showScheduleModal && (
+        <div 
+          className="fixed inset-0 z-[1002] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowScheduleModal(false)}
+        >
+          <div 
+            className="bg-gradient-to-b from-[#1b2136] to-[#10141f] border border-[rgba(130,160,255,.22)] rounded-xl w-full max-w-md overflow-hidden shadow-[0_0_0_1px_rgba(130,160,255,.10),0_0_60px_rgba(61,147,255,.15),0_30px_90px_rgba(0,0,0,.7)]"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-blue-500/10">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Edit size={20} className="text-blue-400" />
-                Edit Blog
+            <div className="flex items-center justify-between p-4 bg-[rgba(10,14,28,.6)] border-b border-[rgba(130,160,255,.18)]">
+              <h2 className="text-lg font-semibold text-[#eef2ff] flex items-center gap-2">
+                <Calendar size={20} className="text-purple-400" />
+                Schedule Blog
               </h2>
               <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setShowSchedulePicker(false);
-                }}
+                onClick={() => setShowScheduleModal(false)}
                 className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-500/10"
               >
                 <X size={20} />
@@ -582,145 +895,39 @@ const BlogsPage: FC = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Title */}
+            <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Title
+                <label className="block text-sm font-medium text-[#dbe4fb] mb-2">
+                  Select Date & Time
                 </label>
                 <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-blue-500/20 text-white focus:outline-none focus:border-blue-500/50 transition-colors placeholder-slate-500"
-                  placeholder="Blog title..."
+                  type="datetime-local"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-[#0a0e1c]/80 border border-[rgba(130,160,255,.2)] text-[#eef2ff] focus:outline-none focus:border-[rgba(130,160,255,.5)] transition-colors"
+                  min={new Date().toISOString().slice(0, 16)}
                 />
-              </div>
-
-              {/* Content Editor */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Content (Rich Text)
-                </label>
-                <div className="bg-[#0a0e1c]/80 rounded-lg border border-blue-500/20 overflow-hidden">
-                  <ReactQuill
-                    theme="snow"
-                    value={editContent}
-                    onChange={setEditContent}
-                    modules={quillModules}
-                    formats={quillFormats}
-                    className="text-white min-h-[300px] [&_.ql-editor]:min-h-[300px] [&_.ql-editor]:text-white [&_.ql-toolbar]:bg-[#1b2138] [&_.ql-toolbar]:border-blue-500/20 [&_.ql-container]:border-blue-500/20 [&_.ql-editor]:bg-[#0a0e1c]"
-                    placeholder="Write your blog content here..."
-                  />
-                </div>
-                <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  Use the toolbar to format your content with headings, lists, images, and more
+                <p className="text-xs text-[#8ea0cc] mt-2 flex items-center gap-1">
+                  <Clock size={12} />
+                  Choose a future date and time to publish this blog
                 </p>
               </div>
-
-              {/* Meta Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Topic
-                  </label>
-                  <input
-                    type="text"
-                    value={editingBlog.topic}
-                    disabled
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-blue-500/10 text-slate-400 cursor-not-allowed"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Status
-                  </label>
-                  <input
-                    type="text"
-                    value={getStatusLabel(editingBlog.status, editingBlog.publishStatus)}
-                    disabled
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/50 border border-blue-500/10 text-slate-400 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              {editingBlog.publishError && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
-                  <AlertCircle size={16} />
-                  {editingBlog.publishError}
-                </div>
-              )}
-
-              {/* Schedule Picker */}
-              {showSchedulePicker && (
-                <div className="p-4 rounded-lg bg-[#0a0e1c]/80 border border-purple-500/20">
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Schedule Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg bg-[#0a0e1c]/80 border border-blue-500/20 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
-                  />
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => handleSchedule(editingBlog._id)}
-                      disabled={isSaving}
-                      className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/20 transition-colors text-sm disabled:opacity-50"
-                    >
-                      {isSaving ? 'Scheduling...' : 'Confirm Schedule'}
-                    </button>
-                    <button
-                      onClick={() => setShowSchedulePicker(false)}
-                      className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="flex flex-wrap items-center justify-end gap-2 p-4 border-t border-blue-500/10">
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-[rgba(130,160,255,.15)] bg-[rgba(8,12,26,.55)]">
               <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setShowSchedulePicker(false);
-                }}
-                className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm inline-flex items-center gap-1.5"
+                onClick={() => setShowScheduleModal(false)}
+                className="px-4 py-2 rounded-lg bg-slate-500/10 text-slate-400 hover:bg-slate-500/20 border border-slate-500/20 transition-colors text-sm"
               >
-                <X size={15} />
                 Cancel
               </button>
-              
               <button
-                onClick={() => handleSaveAsDraft(editingBlog._id)}
-                disabled={isSaving}
-                className="px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors text-sm inline-flex items-center gap-1.5 disabled:opacity-50"
+                onClick={handleSchedule}
+                disabled={isSaving || !scheduleDate}
+                className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/20 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save size={15} />
-                {isSaving ? 'Saving...' : 'Save as Draft'}
-              </button>
-              
-              <button
-                onClick={() => setShowSchedulePicker(!showSchedulePicker)}
-                disabled={isSaving}
-                className="px-4 py-2 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors text-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Calendar size={15} />
-                Schedule
-              </button>
-              
-              <button
-                onClick={() => handlePublish(editingBlog._id)}
-                disabled={isSaving}
-                className="px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors text-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Send size={15} />
-                {isSaving ? 'Publishing...' : 'Publish'}
+                {isSaving ? 'Scheduling...' : 'Confirm Schedule'}
               </button>
             </div>
           </div>
